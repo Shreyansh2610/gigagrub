@@ -1,0 +1,448 @@
+using System.Collections.Generic;
+using UnityEngine;
+using GigaGrub.Audio;
+using GigaGrub.Food;
+
+namespace GigaGrub.Player
+{
+    public class PlayerBody : MonoBehaviour
+    {
+        [Header("Length & Growth Settings")]
+        [Tooltip("Starting number of body segments")]
+        [SerializeField] private int startingLength = 10;
+
+        [Tooltip("Maximum allowed body length")]
+        [SerializeField] private int maxLength = 250;
+
+        [Tooltip("Distance between consecutive body segments")]
+        [SerializeField] private float segmentSpacing = 0.45f;
+
+        [Tooltip("Minimum distance head must move before recording a new trail node")]
+        [SerializeField] private float stepDistance = 0.05f;
+
+        [Tooltip("Global multiplier applied to food growth values")]
+        [SerializeField] private int growthMultiplier = 1;
+
+        [Tooltip("Speed at which newly added segments scale in")]
+        [SerializeField] private float smoothGrowthSpeed = 8f;
+
+        [Header("Visuals")]
+        [SerializeField] private bool enableTaper = true;
+        [SerializeField] private float minTailScale = 0.65f;
+        [SerializeField] private int headSortingOrder = 100;
+
+        [Header("Feedback Effects")]
+        [SerializeField] private bool enableAudioFeedback = true;
+        [SerializeField] private bool enableVisualPunch = true;
+        [SerializeField] private float headPunchScale = 1.16f;
+
+        [Header("References")]
+        [SerializeField] private GameObject segmentPrefab;
+        [SerializeField] private Transform headTransform;
+        [SerializeField] private Transform segmentsParent;
+        [SerializeField] private AudioSource audioSource;
+
+        private readonly List<PlayerSegment> activeSegments = new List<PlayerSegment>();
+        private readonly Queue<PlayerSegment> segmentPool = new Queue<PlayerSegment>();
+
+        private struct TrailPoint
+        {
+            public Vector3 Position;
+            public Quaternion Rotation;
+
+            public TrailPoint(Vector3 pos, Quaternion rot)
+            {
+                Position = pos;
+                Rotation = rot;
+            }
+        }
+
+        private TrailPoint[] trailBuffer = new TrailPoint[2048];
+        private int trailHead = 0;
+        private int trailCount = 0;
+        private Vector3 lastRecordedPosition;
+
+        private int currentScore = 0;
+        private Vector3 originalHeadScale = Vector3.one;
+        private bool isHeadPunching = false;
+
+        public int CurrentLength => activeSegments.Count;
+        public int MaxLength => maxLength;
+        public float SegmentSpacing => segmentSpacing;
+        public int GrowthMultiplier => growthMultiplier;
+        public IReadOnlyList<PlayerSegment> ActiveSegments => activeSegments;
+        public int CurrentScore => currentScore;
+
+        public event System.Action<int, int> OnScoreChanged;
+        public event System.Action<FoodData> OnFoodEaten;
+
+        private void Awake()
+        {
+            if (headTransform == null)
+            {
+                headTransform = transform;
+            }
+
+            originalHeadScale = headTransform.localScale;
+
+            if (segmentsParent == null)
+            {
+                GameObject parentGo = new GameObject("Segments");
+                segmentsParent = parentGo.transform;
+            }
+
+            if (audioSource == null)
+            {
+                audioSource = GetComponent<AudioSource>();
+                if (audioSource == null && enableAudioFeedback)
+                {
+                    audioSource = gameObject.AddComponent<AudioSource>();
+                    audioSource.playOnAwake = false;
+                    audioSource.spatialBlend = 0f; // 2D Sound
+                }
+            }
+
+            PrewarmPool(startingLength + 50);
+        }
+
+        private void Start()
+        {
+            InitializeTrail();
+
+            // Spawn initial segments (instant scale without animation)
+            for (int i = 0; i < startingLength; i++)
+            {
+                AddSegmentInternal(false);
+            }
+
+            // Immediately position all segments
+            UpdateSegments();
+        }
+
+        private void LateUpdate()
+        {
+            RecordHeadPosition();
+            UpdateSegments();
+            UpdateHeadPunch();
+        }
+
+        private void PrewarmPool(int count)
+        {
+            if (segmentPrefab == null)
+            {
+                Debug.LogError("PlayerBody: segmentPrefab is not assigned!", this);
+                return;
+            }
+
+            for (int i = 0; i < count; i++)
+            {
+                CreatePooledSegment();
+            }
+        }
+
+        private PlayerSegment CreatePooledSegment()
+        {
+            if (segmentPrefab == null) return null;
+
+            GameObject go = Instantiate(segmentPrefab, Vector3.zero, Quaternion.identity, segmentsParent);
+            go.SetActive(false);
+
+            PlayerSegment segment = go.GetComponent<PlayerSegment>();
+            if (segment == null)
+            {
+                segment = go.AddComponent<PlayerSegment>();
+            }
+
+            segmentPool.Enqueue(segment);
+            return segment;
+        }
+
+        private void InitializeTrail()
+        {
+            trailCount = 0;
+            trailHead = 0;
+
+            Vector3 startPos = headTransform.position;
+            Quaternion startRot = headTransform.rotation;
+            Vector3 backwardDir = -headTransform.up;
+
+            // Pre-fill trail backwards so segments have a natural layout on start
+            int prefillSteps = Mathf.CeilToInt((startingLength + 5) * segmentSpacing / stepDistance) + 10;
+            if (prefillSteps > trailBuffer.Length)
+            {
+                ResizeBuffer(prefillSteps + 256);
+            }
+
+            for (int i = prefillSteps - 1; i >= 0; i--)
+            {
+                Vector3 pos = startPos + backwardDir * (i * stepDistance);
+                PushTrailPoint(pos, startRot);
+            }
+
+            lastRecordedPosition = startPos;
+        }
+
+        private void PushTrailPoint(Vector3 pos, Quaternion rot)
+        {
+            if (trailCount >= trailBuffer.Length)
+            {
+                ResizeBuffer(trailBuffer.Length * 2);
+            }
+
+            trailHead = (trailHead + 1) % trailBuffer.Length;
+            trailBuffer[trailHead] = new TrailPoint(pos, rot);
+            if (trailCount < trailBuffer.Length)
+            {
+                trailCount++;
+            }
+        }
+
+        private void ResizeBuffer(int newCapacity)
+        {
+            TrailPoint[] newBuffer = new TrailPoint[newCapacity];
+            for (int i = 0; i < trailCount; i++)
+            {
+                int oldIdx = (trailHead - i + trailBuffer.Length) % trailBuffer.Length;
+                newBuffer[i] = trailBuffer[oldIdx];
+            }
+
+            trailBuffer = newBuffer;
+            trailHead = 0;
+        }
+
+        private void RecordHeadPosition()
+        {
+            Vector3 currentPos = headTransform.position;
+            float dist = Vector3.Distance(currentPos, lastRecordedPosition);
+
+            if (dist >= stepDistance)
+            {
+                // In case of large delta (lag spike or fast movement), add intermediate points to preserve trail curve
+                int steps = Mathf.FloorToInt(dist / stepDistance);
+                Vector3 stepVector = (currentPos - lastRecordedPosition).normalized * stepDistance;
+                Quaternion currentRot = headTransform.rotation;
+
+                for (int s = 1; s <= steps; s++)
+                {
+                    Vector3 interpPos = lastRecordedPosition + stepVector * s;
+                    PushTrailPoint(interpPos, currentRot);
+                }
+
+                lastRecordedPosition = lastRecordedPosition + stepVector * steps;
+            }
+        }
+
+        private void UpdateSegments()
+        {
+            if (activeSegments.Count == 0 || trailCount == 0) return;
+
+            Vector3 currentHeadPos = headTransform.position;
+            Quaternion currentHeadRot = headTransform.rotation;
+
+            for (int i = 0; i < activeSegments.Count; i++)
+            {
+                float targetDistance = (i + 1) * segmentSpacing;
+                GetPointAtDistance(currentHeadPos, currentHeadRot, targetDistance, out Vector3 targetPos, out Quaternion targetRot);
+
+                PlayerSegment segment = activeSegments[i];
+                segment.transform.position = targetPos;
+                segment.transform.rotation = targetRot;
+            }
+        }
+
+        private void GetPointAtDistance(Vector3 headPos, Quaternion headRot, float targetDistance, out Vector3 resultPos, out Quaternion resultRot)
+        {
+            float accumulatedDistance = 0f;
+            Vector3 prevPos = headPos;
+            Quaternion prevRot = headRot;
+
+            for (int k = 0; k < trailCount; k++)
+            {
+                int bufferIdx = (trailHead - k + trailBuffer.Length) % trailBuffer.Length;
+                TrailPoint point = trailBuffer[bufferIdx];
+
+                float segDist = Vector3.Distance(prevPos, point.Position);
+                if (accumulatedDistance + segDist >= targetDistance)
+                {
+                    float remaining = targetDistance - accumulatedDistance;
+                    float t = segDist > 0.0001f ? remaining / segDist : 0f;
+
+                    resultPos = Vector3.Lerp(prevPos, point.Position, t);
+                    resultRot = Quaternion.Slerp(prevRot, point.Rotation, t);
+                    return;
+                }
+
+                accumulatedDistance += segDist;
+                prevPos = point.Position;
+                prevRot = point.Rotation;
+            }
+
+            // Stable extrapolation: if trail is shorter than target distance, extrapolate smoothly backwards
+            Vector3 tailBackwardDir = -(headRot * Vector3.up);
+            if (trailCount >= 2)
+            {
+                int lastIdx = (trailHead - (trailCount - 1) + trailBuffer.Length) % trailBuffer.Length;
+                int prevIdx = (trailHead - (trailCount - 2) + trailBuffer.Length) % trailBuffer.Length;
+                Vector3 diff = trailBuffer[lastIdx].Position - trailBuffer[prevIdx].Position;
+                if (diff.sqrMagnitude > 0.0001f)
+                {
+                    tailBackwardDir = diff.normalized;
+                }
+            }
+
+            float remainingExtrapDist = targetDistance - accumulatedDistance;
+            resultPos = prevPos + tailBackwardDir * remainingExtrapDist;
+            resultRot = prevRot;
+        }
+
+        public void SetSettings(int startLen, int maxLen, float spacing, int growthMult)
+        {
+            startingLength = Mathf.Max(1, startLen);
+            maxLength = Mathf.Max(startingLength, maxLen);
+            segmentSpacing = Mathf.Max(0.1f, spacing);
+            growthMultiplier = Mathf.Max(1, growthMult);
+        }
+
+        public void AddSegment()
+        {
+            AddSegmentInternal(true);
+        }
+
+        private void AddSegmentInternal(bool smoothScaleIn)
+        {
+            if (activeSegments.Count >= maxLength) return;
+
+            if (segmentPool.Count == 0)
+            {
+                CreatePooledSegment();
+            }
+
+            PlayerSegment newSegment = segmentPool.Dequeue();
+            int segmentIndex = activeSegments.Count;
+
+            int order = headSortingOrder - (segmentIndex + 1);
+            float scaleMultiplier = CalculateSegmentScale(segmentIndex, activeSegments.Count + 1);
+
+            Vector3 spawnPos = headTransform.position;
+            Quaternion spawnRot = headTransform.rotation;
+
+            if (activeSegments.Count > 0)
+            {
+                spawnPos = activeSegments[activeSegments.Count - 1].transform.position;
+                spawnRot = activeSegments[activeSegments.Count - 1].transform.rotation;
+            }
+
+            newSegment.OnSpawnFromPool(spawnPos, spawnRot, order, scaleMultiplier, smoothScaleIn, smoothGrowthSpeed);
+            activeSegments.Add(newSegment);
+
+            // Re-taper existing segments smoothly if needed
+            if (enableTaper && smoothScaleIn)
+            {
+                RefreshSegmentTaper();
+            }
+
+            // Ensure trail has enough pre-buffered capacity for new length
+            int requiredTrailSteps = Mathf.CeilToInt((activeSegments.Count + 5) * segmentSpacing / stepDistance);
+            if (requiredTrailSteps > trailBuffer.Length)
+            {
+                ResizeBuffer(requiredTrailSteps + 256);
+            }
+        }
+
+        private float CalculateSegmentScale(int segmentIndex, int totalCount)
+        {
+            if (!enableTaper || totalCount <= 1) return 1f;
+            float t = Mathf.Clamp01((float)segmentIndex / Mathf.Max(1, totalCount - 1));
+            return Mathf.Lerp(1f, minTailScale, t);
+        }
+
+        private void RefreshSegmentTaper()
+        {
+            int count = activeSegments.Count;
+            for (int i = 0; i < count; i++)
+            {
+                float targetScale = CalculateSegmentScale(i, count);
+                activeSegments[i].SetScaleMultiplier(targetScale, false, smoothGrowthSpeed);
+            }
+        }
+
+        public void AddSegments(int count)
+        {
+            int toAdd = Mathf.Min(count, maxLength - activeSegments.Count);
+            for (int i = 0; i < toAdd; i++)
+            {
+                AddSegmentInternal(true);
+            }
+        }
+
+        public void RemoveSegment()
+        {
+            if (activeSegments.Count == 0) return;
+
+            int lastIdx = activeSegments.Count - 1;
+            PlayerSegment segment = activeSegments[lastIdx];
+            activeSegments.RemoveAt(lastIdx);
+
+            segment.OnReturnToPool();
+            segmentPool.Enqueue(segment);
+        }
+
+        public void OnEatFood(FoodData foodData)
+        {
+            if (foodData == null) return;
+
+            currentScore += foodData.ScoreValue;
+            OnScoreChanged?.Invoke(currentScore, foodData.ScoreValue);
+            OnFoodEaten?.Invoke(foodData);
+
+            int segmentsToAdd = foodData.GrowthValue * growthMultiplier;
+            if (segmentsToAdd > 0)
+            {
+                AddSegments(segmentsToAdd);
+            }
+
+            // Audio feedback
+            if (enableAudioFeedback && audioSource != null)
+            {
+                SoundEffectGenerator.PlayEatSound(audioSource, 0.7f, 0.15f);
+            }
+
+            // Visual head punch feedback
+            if (enableVisualPunch && headTransform != null)
+            {
+                headTransform.localScale = originalHeadScale * headPunchScale;
+                isHeadPunching = true;
+            }
+
+            // Visual particle burst feedback
+            EatingEffect.Spawn(transform.position, foodData.FoodColor, foodData.ScaleMultiplier);
+        }
+
+        private void UpdateHeadPunch()
+        {
+            if (isHeadPunching && headTransform != null)
+            {
+                headTransform.localScale = Vector3.Lerp(headTransform.localScale, originalHeadScale, Time.deltaTime * 10f);
+                if (Vector3.Distance(headTransform.localScale, originalHeadScale) < 0.01f)
+                {
+                    headTransform.localScale = originalHeadScale;
+                    isHeadPunching = false;
+                }
+            }
+        }
+
+        public void ResetScore()
+        {
+            currentScore = 0;
+            OnScoreChanged?.Invoke(currentScore, 0);
+        }
+
+        private void OnDestroy()
+        {
+            if (segmentsParent != null)
+            {
+                Destroy(segmentsParent.gameObject);
+            }
+        }
+    }
+}
