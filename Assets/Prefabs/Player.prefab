@@ -14,6 +14,9 @@ GameObject:
   - component: {fileID: 5000001}
   - component: {fileID: 3417842725045405790}
   - component: {fileID: 11400001}
+  - component: {fileID: 3530432816192107290}
+  - component: {fileID: 4557205266176308223}
+  - component: {fileID: 4287721290211505290}
   - component: {fileID: 11400002}
   m_Layer: 0
   m_Name: Player
@@ -273,6 +276,57 @@ MonoBehaviour:
   turnSpeed: 360
   headRadius: 0.5
   joystick: {fileID: 0}
+--- !u!114 &3530432816192107290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d50603f016d2b544fbccab9285ca6844, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Systems.GrowthSystem
+  playerBody: {fileID: 11400002}
+  growthRate: 30
+  minIntervalBetweenSegments: 0.02
+--- !u!114 &4557205266176308223
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f226aabd17b7e964ab1d137cb33b4a36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.CreatureDeath
+  dropFoodOnDeath: 1
+  foodDropRatio: 0.75
+  overrideDropFood: {fileID: 0}
+  creatureBody: {fileID: 11400002}
+  playerController: {fileID: 11400001}
+  aiController: {fileID: 0}
+  headCollider: {fileID: 5800001}
+  audioSource: {fileID: 3417842725045405790}
+--- !u!114 &4287721290211505290
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b17b8c347aa3af241b020f0f445ea4ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.CreatureCollision
+  headToHeadRule: 0
+  ownerBody: {fileID: 11400002}
+  creatureDeath: {fileID: 4557205266176308223}
+  headCollider: {fileID: 5800001}
 --- !u!114 &11400002
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -285,8 +339,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 85bc060f633619b4ea583e18cd3edaf2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.PlayerBody
+  isPlayer: 1
   startingLength: 10
-  maxLength: 250
+  maxLength: 600
   segmentSpacing: 0.45
   stepDistance: 0.05
   growthMultiplier: 1
@@ -294,6 +349,8 @@ MonoBehaviour:
   enableTaper: 1
   minTailScale: 0.65
   headSortingOrder: 100
+  headTintColor: {r: 1, g: 1, b: 1, a: 1}
+  bodyTintColor: {r: 1, g: 1, b: 1, a: 1}
   enableAudioFeedback: 1
   enableVisualPunch: 1
   headPunchScale: 1.16
@@ -301,3 +358,7 @@ MonoBehaviour:
   headTransform: {fileID: 400001}
   segmentsParent: {fileID: 0}
   audioSource: {fileID: 3417842725045405790}
+  growthSystem: {fileID: 3530432816192107290}
+  creatureCollision: {fileID: 4287721290211505290}
+  creatureDeath: {fileID: 4557205266176308223}
+  headSpriteRenderer: {fileID: 0}

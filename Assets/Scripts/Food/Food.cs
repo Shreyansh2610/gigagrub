@@ -14,7 +14,7 @@ namespace GigaGrub.Food
         private FoodData data;
         private Vector3 baseScale = Vector3.one;
         private float randomOffset;
-        private bool isConsumed;
+        private bool isConsumed = false;
 
         public FoodData Data => data;
         public bool IsConsumed => isConsumed;
@@ -100,6 +100,7 @@ namespace GigaGrub.Food
 
         public void Consume(PlayerBody playerBody)
         {
+            // Thread & frame-safe atomic check: avoid duplicate consumption & duplicate score
             if (isConsumed) return;
             isConsumed = true;
 
@@ -127,7 +128,8 @@ namespace GigaGrub.Food
         {
             if (isConsumed) return;
 
-            if (other.CompareTag("Player") || other.gameObject.layer == LayerMask.NameToLayer("Player"))
+            // Check if player or AI creature head triggered this food
+            if (other.CompareTag("Player") || other.CompareTag("AICreature") || other.gameObject.layer == LayerMask.NameToLayer("Player"))
             {
                 PlayerBody body = other.GetComponent<PlayerBody>();
                 if (body == null)

@@ -54,16 +54,31 @@
   <ItemGroup>
     <Compile Include="Assets\Scripts\UI\ScoreUI.cs" />
     <Compile Include="Assets\Scripts\UI\VirtualJoystick.cs" />
+    <Compile Include="Assets\Scripts\AI\AIController.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerSegment.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerController.cs" />
+    <Compile Include="Assets\Scripts\Systems\GrowthSystem.cs" />
+    <Compile Include="Assets\Scripts\Player\CreatureDeath.cs" />
+    <Compile Include="Assets\Scripts\AI\AIWorldDetector.cs" />
+    <Compile Include="Assets\Scripts\AI\AIState.cs" />
+    <Compile Include="Assets\Scripts\UI\GameOverUI.cs" />
+    <Compile Include="Assets\Scripts\AI\AISpawner.cs" />
+    <Compile Include="Assets\Scripts\AI\AIStateMachine.cs" />
     <Compile Include="Assets\Scripts\Food\EatingEffect.cs" />
     <Compile Include="Assets\Scripts\Food\Food.cs" />
     <Compile Include="Assets\Scripts\Player\PlayerBody.cs" />
     <Compile Include="Assets\Scripts\Food\FoodData.cs" />
+    <Compile Include="Assets\Scripts\Systems\ScoreManager.cs" />
     <Compile Include="Assets\Scripts\Core\CameraFollow.cs" />
+    <Compile Include="Assets\Scripts\Core\GameManager.cs" />
+    <Compile Include="Assets\Scripts\Player\DeathReason.cs" />
+    <Compile Include="Assets\Scripts\Player\CreatureCollision.cs" />
+    <Compile Include="Assets\Scripts\UI\GameplayHUD.cs" />
     <Compile Include="Assets\Scripts\Core\ArenaManager.cs" />
+    <Compile Include="Assets\Scripts\UI\SafeAreaFitter.cs" />
     <Compile Include="Assets\Scripts\Food\FoodSpawner.cs" />
     <Compile Include="Assets\Scripts\Audio\SoundEffectGenerator.cs" />
+    <Compile Include="Assets\Scripts\UI\PauseMenuUI.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="UnityEngine">

@@ -15,6 +15,7 @@ namespace GigaGrub.Core
         [SerializeField] private Color boundaryColor = new Color(0.1f, 0.8f, 1f, 0.9f);
         [SerializeField] private float boundaryWidth = 0.3f;
         [SerializeField] private Material boundaryMaterial;
+        [SerializeField] private Color backgroundColor = new Color(0.06f, 0.08f, 0.12f, 1f);
 
         [Header("Colliders")]
         [SerializeField] private bool generateColliders = true;
@@ -22,11 +23,14 @@ namespace GigaGrub.Core
 
         private LineRenderer lineRenderer;
         private Transform wallsParent;
+        private Transform backgroundTransform;
 
         public Vector2 ArenaSize => arenaSize;
         public Vector2 HalfSize => arenaSize * 0.5f;
 
         public Rect Bounds => new Rect(-arenaSize.x * 0.5f, -arenaSize.y * 0.5f, arenaSize.x, arenaSize.y);
+
+        private static Sprite solidSquareSprite;
 
         private void Awake()
         {
@@ -37,6 +41,7 @@ namespace GigaGrub.Core
             }
             Instance = this;
 
+            SetupBackground();
             SetupBoundaryVisuals();
             if (generateColliders)
             {
@@ -48,10 +53,74 @@ namespace GigaGrub.Core
         {
             if (arenaSize.x < 10f) arenaSize.x = 10f;
             if (arenaSize.y < 10f) arenaSize.y = 10f;
+        }
 
-            if (Application.isEditor && !Application.isPlaying)
+        public void SetupBackground()
+        {
+            // Clean up any old duplicate BackgroundGrid objects to ensure no circular/vignetted sprites exist
+            Transform[] children = GetComponentsInChildren<Transform>(true);
+            Transform primaryBg = null;
+            for (int i = 0; i < children.Length; i++)
             {
-                SetupBoundaryVisuals();
+                Transform child = children[i];
+                if (child == null || child == transform || child.parent != transform) continue;
+                if (child.name.StartsWith("BackgroundGrid"))
+                {
+                    if (primaryBg == null)
+                    {
+                        primaryBg = child;
+                    }
+                    else
+                    {
+                        if (Application.isPlaying)
+                            Destroy(child.gameObject);
+                        else
+                            DestroyImmediate(child.gameObject);
+                    }
+                }
+            }
+
+            if (primaryBg == null)
+            {
+                GameObject bgGo = new GameObject("BackgroundGrid");
+                bgGo.transform.SetParent(transform, false);
+                primaryBg = bgGo.transform;
+            }
+
+            backgroundTransform = primaryBg;
+            backgroundTransform.name = "BackgroundGrid";
+            backgroundTransform.localPosition = Vector3.zero;
+
+            // Massive background coverage (500x500 units) so camera view can never see outside void at any aspect ratio or zoom
+            float bgSizeX = Mathf.Max(arenaSize.x * 5f, 500f);
+            float bgSizeY = Mathf.Max(arenaSize.y * 5f, 500f);
+            backgroundTransform.localScale = new Vector3(bgSizeX, bgSizeY, 1f);
+
+            SpriteRenderer sr = backgroundTransform.GetComponent<SpriteRenderer>();
+            if (sr == null)
+            {
+                sr = backgroundTransform.gameObject.AddComponent<SpriteRenderer>();
+            }
+
+            // Create a guaranteed 100% solid square sprite with zero alpha corner falloff
+            if (solidSquareSprite == null)
+            {
+                Texture2D tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                tex.wrapMode = TextureWrapMode.Clamp;
+                tex.filterMode = FilterMode.Point;
+                Color[] pixels = new Color[] { Color.white, Color.white, Color.white, Color.white };
+                tex.SetPixels(pixels);
+                tex.Apply();
+                solidSquareSprite = Sprite.Create(tex, new Rect(0, 0, 2, 2), new Vector2(0.5f, 0.5f), 2f);
+            }
+
+            sr.sprite = solidSquareSprite;
+            sr.color = backgroundColor;
+            sr.sortingOrder = -100;
+
+            if (Camera.main != null)
+            {
+                Camera.main.backgroundColor = backgroundColor;
             }
         }
 

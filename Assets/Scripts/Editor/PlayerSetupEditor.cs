@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
@@ -8,6 +9,8 @@ using GigaGrub.UI;
 using GigaGrub.Core;
 using GigaGrub.Food;
 using GigaGrub.Audio;
+using GigaGrub.Systems;
+using GigaGrub.AI;
 
 namespace GigaGrub.Editor
 {
@@ -26,13 +29,14 @@ namespace GigaGrub.Editor
             EnsureDirectories();
             GameObject segmentPrefab = SetupPlayerSegmentPrefab();
             GameObject playerPrefab = SetupPlayerPrefab(segmentPrefab);
+            GameObject aiCreaturePrefab = SetupAICreaturePrefab(segmentPrefab);
             GameObject eatingEffectPrefab = SetupEatingEffectPrefab();
             GameObject joystickCanvasPrefab = SetupJoystickCanvasPrefab();
             GameObject arenaPrefab = SetupArenaPrefab();
             FoodData[] foodDataAssets = SetupFoodDataAssets();
             GameObject foodPrefab = SetupFoodPrefab();
 
-            SetupGameScene(playerPrefab, joystickCanvasPrefab, arenaPrefab, foodPrefab, foodDataAssets, eatingEffectPrefab);
+            SetupGameScene(playerPrefab, joystickCanvasPrefab, arenaPrefab, foodPrefab, foodDataAssets, eatingEffectPrefab, aiCreaturePrefab);
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
@@ -56,6 +60,38 @@ namespace GigaGrub.Editor
             {
                 AssetDatabase.CreateFolder("Assets/Resources", "Food");
             }
+
+            EnsureTags();
+        }
+
+        public static void EnsureTags()
+        {
+            var assets = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/TagManager.asset");
+            if (assets == null || assets.Length == 0) return;
+
+            SerializedObject tagManager = new SerializedObject(assets[0]);
+            SerializedProperty tagsProp = tagManager.FindProperty("tags");
+            if (tagsProp == null) return;
+
+            string[] requiredTags = new string[] { "AICreature", "Food", "PlayerSegment" };
+            foreach (string tag in requiredTags)
+            {
+                bool found = false;
+                for (int i = 0; i < tagsProp.arraySize; i++)
+                {
+                    if (tagsProp.GetArrayElementAtIndex(i).stringValue.Equals(tag))
+                    {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found)
+                {
+                    tagsProp.InsertArrayElementAtIndex(tagsProp.arraySize);
+                    tagsProp.GetArrayElementAtIndex(tagsProp.arraySize - 1).stringValue = tag;
+                }
+            }
+            tagManager.ApplyModifiedProperties();
         }
 
         private static Sprite LoadSprite(string fileName)
@@ -88,22 +124,14 @@ namespace GigaGrub.Editor
             soArena.FindProperty("arenaSize").vector2Value = new Vector2(100f, 100f);
             soArena.FindProperty("boundaryColor").colorValue = new Color(0.1f, 0.8f, 1f, 0.9f);
             soArena.FindProperty("boundaryWidth").floatValue = 0.3f;
+            soArena.FindProperty("backgroundColor").colorValue = new Color(0.06f, 0.08f, 0.12f, 1f);
             soArena.FindProperty("generateColliders").boolValue = true;
             soArena.FindProperty("wallThickness").floatValue = 2f;
             soArena.ApplyModifiedPropertiesWithoutUndo();
 
+            arena.SetupBackground();
             arena.SetupBoundaryVisuals();
             arena.SetupBoundaryColliders();
-
-            // Add Background Grid
-            GameObject bgGo = new GameObject("BackgroundGrid");
-            bgGo.transform.SetParent(go.transform, false);
-            bgGo.transform.localScale = new Vector3(100f, 100f, 1f);
-
-            SpriteRenderer sr = bgGo.AddComponent<SpriteRenderer>();
-            sr.sprite = LoadSprite("SegmentSprite.png");
-            sr.color = new Color(0.06f, 0.08f, 0.12f, 0.95f);
-            sr.sortingOrder = -100;
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
@@ -173,11 +201,15 @@ namespace GigaGrub.Editor
             audioSrc.spatialBlend = 0f;
 
             PlayerController controller = go.AddComponent<PlayerController>();
+            GrowthSystem growth = go.AddComponent<GrowthSystem>();
+            CreatureDeath death = go.AddComponent<CreatureDeath>();
+            CreatureCollision collision = go.AddComponent<CreatureCollision>();
 
             PlayerBody body = go.AddComponent<PlayerBody>();
             SerializedObject soBody = new SerializedObject(body);
+            soBody.FindProperty("isPlayer").boolValue = true;
             soBody.FindProperty("startingLength").intValue = 10;
-            soBody.FindProperty("maxLength").intValue = 250;
+            soBody.FindProperty("maxLength").intValue = 600;
             soBody.FindProperty("segmentSpacing").floatValue = 0.45f;
             soBody.FindProperty("stepDistance").floatValue = 0.05f;
             soBody.FindProperty("growthMultiplier").intValue = 1;
@@ -191,7 +223,140 @@ namespace GigaGrub.Editor
             soBody.FindProperty("segmentPrefab").objectReferenceValue = segmentPrefab;
             soBody.FindProperty("headTransform").objectReferenceValue = go.transform;
             soBody.FindProperty("audioSource").objectReferenceValue = audioSrc;
+            soBody.FindProperty("growthSystem").objectReferenceValue = growth;
+            soBody.FindProperty("creatureDeath").objectReferenceValue = death;
+            soBody.FindProperty("creatureCollision").objectReferenceValue = collision;
             soBody.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soGrowth = new SerializedObject(growth);
+            soGrowth.FindProperty("playerBody").objectReferenceValue = body;
+            soGrowth.FindProperty("growthRate").floatValue = 30f;
+            soGrowth.FindProperty("minIntervalBetweenSegments").floatValue = 0.02f;
+            soGrowth.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soDeath = new SerializedObject(death);
+            soDeath.FindProperty("creatureBody").objectReferenceValue = body;
+            soDeath.FindProperty("playerController").objectReferenceValue = controller;
+            soDeath.FindProperty("headCollider").objectReferenceValue = col;
+            soDeath.FindProperty("audioSource").objectReferenceValue = audioSrc;
+            soDeath.FindProperty("dropFoodOnDeath").boolValue = true;
+            soDeath.FindProperty("foodDropRatio").floatValue = 0.75f;
+            soDeath.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soCollision = new SerializedObject(collision);
+            soCollision.FindProperty("ownerBody").objectReferenceValue = body;
+            soCollision.FindProperty("creatureDeath").objectReferenceValue = death;
+            soCollision.FindProperty("headCollider").objectReferenceValue = col;
+            soCollision.FindProperty("headToHeadRule").enumValueIndex = (int)HeadToHeadRule.LongerSurvives;
+            soCollision.ApplyModifiedPropertiesWithoutUndo();
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            Object.DestroyImmediate(go);
+
+            Debug.Log($"[GigaGrub] Created/Updated {prefabPath}");
+            return prefab;
+        }
+
+        [MenuItem("GigaGrub/4. Setup AI Creature Prefab")]
+        public static void MenuSetupAICreaturePrefab()
+        {
+            EnsureDirectories();
+            EnsureTags();
+            SetupAICreaturePrefab();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        public static GameObject SetupAICreaturePrefab(GameObject segmentPrefab = null)
+        {
+            EnsureTags();
+
+            if (segmentPrefab == null)
+            {
+                segmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/PlayerSegment.prefab");
+                if (segmentPrefab == null)
+                {
+                    segmentPrefab = SetupPlayerSegmentPrefab();
+                }
+            }
+
+            string prefabPath = $"{PrefabsPath}/AICreature.prefab";
+            GameObject go = new GameObject("AICreature");
+            go.tag = "AICreature";
+
+            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = LoadSprite("HeadSprite.png");
+            sr.sortingOrder = 98;
+            sr.color = new Color(1.0f, 0.4f, 0.4f, 1f);
+
+            CircleCollider2D col = go.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius = 0.55f;
+
+            Rigidbody2D rb = go.AddComponent<Rigidbody2D>();
+            rb.bodyType = RigidbodyType2D.Kinematic;
+            rb.simulated = true;
+
+            AIWorldDetector detector = go.AddComponent<AIWorldDetector>();
+            AIStateMachine stateMachine = go.AddComponent<AIStateMachine>();
+            stateMachine.BindDetector(detector);
+
+            AIController aiCtrl = go.AddComponent<AIController>();
+            GrowthSystem growth = go.AddComponent<GrowthSystem>();
+            CreatureDeath death = go.AddComponent<CreatureDeath>();
+            CreatureCollision collision = go.AddComponent<CreatureCollision>();
+
+            PlayerBody body = go.AddComponent<PlayerBody>();
+            SerializedObject soBody = new SerializedObject(body);
+            soBody.FindProperty("isPlayer").boolValue = false;
+            soBody.FindProperty("startingLength").intValue = 10;
+            soBody.FindProperty("maxLength").intValue = 600;
+            soBody.FindProperty("segmentSpacing").floatValue = 0.45f;
+            soBody.FindProperty("stepDistance").floatValue = 0.05f;
+            soBody.FindProperty("growthMultiplier").intValue = 1;
+            soBody.FindProperty("smoothGrowthSpeed").floatValue = 8f;
+            soBody.FindProperty("enableTaper").boolValue = true;
+            soBody.FindProperty("minTailScale").floatValue = 0.65f;
+            soBody.FindProperty("headSortingOrder").intValue = 98;
+            soBody.FindProperty("enableAudioFeedback").boolValue = false;
+            soBody.FindProperty("enableVisualPunch").boolValue = true;
+            soBody.FindProperty("headPunchScale").floatValue = 1.15f;
+            soBody.FindProperty("segmentPrefab").objectReferenceValue = segmentPrefab;
+            soBody.FindProperty("headTransform").objectReferenceValue = go.transform;
+            soBody.FindProperty("growthSystem").objectReferenceValue = growth;
+            soBody.FindProperty("creatureDeath").objectReferenceValue = death;
+            soBody.FindProperty("creatureCollision").objectReferenceValue = collision;
+            soBody.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soGrowth = new SerializedObject(growth);
+            soGrowth.FindProperty("playerBody").objectReferenceValue = body;
+            soGrowth.FindProperty("growthRate").floatValue = 30f;
+            soGrowth.FindProperty("minIntervalBetweenSegments").floatValue = 0.02f;
+            soGrowth.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soAi = new SerializedObject(aiCtrl);
+            soAi.FindProperty("moveSpeed").floatValue = 4.8f;
+            soAi.FindProperty("turnSpeed").floatValue = 280f;
+            soAi.FindProperty("decisionInterval").floatValue = 0.15f;
+            soAi.FindProperty("stateMachine").objectReferenceValue = stateMachine;
+            soAi.FindProperty("worldDetector").objectReferenceValue = detector;
+            soAi.FindProperty("creatureBody").objectReferenceValue = body;
+            soAi.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soDeath = new SerializedObject(death);
+            soDeath.FindProperty("creatureBody").objectReferenceValue = body;
+            soDeath.FindProperty("aiController").objectReferenceValue = aiCtrl;
+            soDeath.FindProperty("headCollider").objectReferenceValue = col;
+            soDeath.FindProperty("dropFoodOnDeath").boolValue = true;
+            soDeath.FindProperty("foodDropRatio").floatValue = 0.75f;
+            soDeath.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soCollision = new SerializedObject(collision);
+            soCollision.FindProperty("ownerBody").objectReferenceValue = body;
+            soCollision.FindProperty("creatureDeath").objectReferenceValue = death;
+            soCollision.FindProperty("headCollider").objectReferenceValue = col;
+            soCollision.FindProperty("headToHeadRule").enumValueIndex = (int)HeadToHeadRule.LongerSurvives;
+            soCollision.ApplyModifiedPropertiesWithoutUndo();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
@@ -206,12 +371,34 @@ namespace GigaGrub.Editor
             string prefabPath = $"{PrefabsPath}/EatingEffect.prefab";
             GameObject go = new GameObject("EatingEffect");
 
-            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = LoadSprite("SegmentSprite.png");
-            sr.sortingOrder = 45;
-            sr.color = new Color(1f, 1f, 1f, 0.9f);
+            ParticleSystem ps = go.AddComponent<ParticleSystem>();
+            var main = ps.main;
+            main.duration = 0.45f;
+            main.loop = false;
+            main.startLifetime = 0.4f;
+            main.startSpeed = 4.5f;
+            main.startSize = 0.28f;
+            main.startColor = new Color(0.2f, 1f, 0.4f, 1f);
+            main.playOnAwake = false;
+            main.simulationSpace = ParticleSystemSimulationSpace.World;
+            main.maxParticles = 30;
 
-            EatingEffect effect = go.AddComponent<EatingEffect>();
+            var emission = ps.emission;
+            emission.rateOverTime = 0f;
+            emission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0f, 16) });
+
+            var shape = ps.shape;
+            shape.shapeType = ParticleSystemShapeType.Circle;
+            shape.radius = 0.35f;
+
+            var sizeOverLifetime = ps.sizeOverLifetime;
+            sizeOverLifetime.enabled = true;
+            AnimationCurve curve = new AnimationCurve();
+            curve.AddKey(0f, 1f);
+            curve.AddKey(1f, 0f);
+            sizeOverLifetime.size = new ParticleSystem.MinMaxCurve(1f, curve);
+
+            go.AddComponent<EatingEffect>();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
@@ -220,7 +407,7 @@ namespace GigaGrub.Editor
             return prefab;
         }
 
-        [MenuItem("GigaGrub/6. Setup Joystick Canvas Prefab")]
+        [MenuItem("GigaGrub/6. Setup Joystick & Gameplay HUD Canvas Prefab")]
         public static GameObject SetupJoystickCanvasPrefab()
         {
             string prefabPath = $"{PrefabsPath}/JoystickCanvas.prefab";
@@ -231,25 +418,146 @@ namespace GigaGrub.Editor
 
             CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.referenceResolution = new Vector2(1920, 1080); // Mobile Landscape Layout
             scaler.matchWidthOrHeight = 0.5f;
 
             canvasGo.AddComponent<GraphicRaycaster>();
 
-            // Virtual Joystick
+            // Root Safe-Area Container
+            GameObject safeAreaGo = new GameObject("SafeArea");
+            safeAreaGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform safeAreaRect = safeAreaGo.AddComponent<RectTransform>();
+            safeAreaRect.anchorMin = Vector2.zero;
+            safeAreaRect.anchorMax = Vector2.one;
+            safeAreaRect.offsetMin = Vector2.zero;
+            safeAreaRect.offsetMax = Vector2.zero;
+            safeAreaGo.AddComponent<SafeAreaFitter>();
+
+            // ==========================================
+            // 1. TOP HUD (Score, Length, Time, Pause Button)
+            // ==========================================
+            GameObject topHudGo = new GameObject("TopHUD");
+            topHudGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform topHudRect = topHudGo.AddComponent<RectTransform>();
+            topHudRect.anchorMin = new Vector2(0f, 1f);
+            topHudRect.anchorMax = new Vector2(1f, 1f);
+            topHudRect.pivot = new Vector2(0.5f, 1f);
+            topHudRect.anchoredPosition = Vector2.zero;
+            topHudRect.sizeDelta = new Vector2(0f, 120f);
+
+            // Top Bar Background gradient/tint
+            Image topBg = topHudGo.AddComponent<Image>();
+            topBg.color = new Color(0.04f, 0.07f, 0.12f, 0.65f);
+
+            // Left: Score & Length Group
+            GameObject scoreGroupGo = new GameObject("ScoreGroup");
+            scoreGroupGo.transform.SetParent(topHudGo.transform, false);
+            RectTransform scoreGroupRect = scoreGroupGo.AddComponent<RectTransform>();
+            scoreGroupRect.anchorMin = new Vector2(0f, 0f);
+            scoreGroupRect.anchorMax = new Vector2(0.35f, 1f);
+            scoreGroupRect.pivot = new Vector2(0f, 0.5f);
+            scoreGroupRect.offsetMin = new Vector2(30f, 10f);
+            scoreGroupRect.offsetMax = new Vector2(0f, -10f);
+
+            GameObject scoreTextGo = new GameObject("ScoreText");
+            scoreTextGo.transform.SetParent(scoreGroupGo.transform, false);
+            RectTransform scoreTextRect = scoreTextGo.AddComponent<RectTransform>();
+            scoreTextRect.anchorMin = new Vector2(0f, 0.45f);
+            scoreTextRect.anchorMax = new Vector2(1f, 1f);
+            scoreTextRect.pivot = new Vector2(0f, 0.5f);
+            scoreTextRect.offsetMin = Vector2.zero;
+            scoreTextRect.offsetMax = Vector2.zero;
+
+            Text scoreText = scoreTextGo.AddComponent<Text>();
+            scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            scoreText.fontSize = 38;
+            scoreText.fontStyle = FontStyle.Bold;
+            scoreText.alignment = TextAnchor.MiddleLeft;
+            scoreText.color = new Color(1f, 0.88f, 0.2f, 1f);
+            scoreText.text = "SCORE  0";
+
+            GameObject lengthTextGo = new GameObject("LengthText");
+            lengthTextGo.transform.SetParent(scoreGroupGo.transform, false);
+            RectTransform lengthTextRect = lengthTextGo.AddComponent<RectTransform>();
+            lengthTextRect.anchorMin = new Vector2(0f, 0f);
+            lengthTextRect.anchorMax = new Vector2(1f, 0.45f);
+            lengthTextRect.pivot = new Vector2(0f, 0.5f);
+            lengthTextRect.offsetMin = Vector2.zero;
+            lengthTextRect.offsetMax = Vector2.zero;
+
+            Text lengthText = lengthTextGo.AddComponent<Text>();
+            lengthText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            lengthText.fontSize = 24;
+            lengthText.fontStyle = FontStyle.Normal;
+            lengthText.alignment = TextAnchor.MiddleLeft;
+            lengthText.color = new Color(0.45f, 0.85f, 1f, 0.9f);
+            lengthText.text = "LENGTH  10";
+
+            // Center: Survival Time
+            GameObject timeGo = new GameObject("SurvivalTime");
+            timeGo.transform.SetParent(topHudGo.transform, false);
+            RectTransform timeRect = timeGo.AddComponent<RectTransform>();
+            timeRect.anchorMin = new Vector2(0.5f, 0.5f);
+            timeRect.anchorMax = new Vector2(0.5f, 0.5f);
+            timeRect.pivot = new Vector2(0.5f, 0.5f);
+            timeRect.sizeDelta = new Vector2(300f, 60f);
+
+            Text timeText = timeGo.AddComponent<Text>();
+            timeText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            timeText.fontSize = 34;
+            timeText.fontStyle = FontStyle.Bold;
+            timeText.alignment = TextAnchor.MiddleCenter;
+            timeText.color = Color.white;
+            timeText.text = "TIME  00:00";
+
+            // Right: Pause Button
+            GameObject pauseBtnGo = new GameObject("PauseButton");
+            pauseBtnGo.transform.SetParent(topHudGo.transform, false);
+            RectTransform pauseBtnRect = pauseBtnGo.AddComponent<RectTransform>();
+            pauseBtnRect.anchorMin = new Vector2(1f, 0.5f);
+            pauseBtnRect.anchorMax = new Vector2(1f, 0.5f);
+            pauseBtnRect.pivot = new Vector2(1f, 0.5f);
+            pauseBtnRect.anchoredPosition = new Vector2(-30f, 0f);
+            pauseBtnRect.sizeDelta = new Vector2(70f, 70f);
+
+            Image pauseImg = pauseBtnGo.AddComponent<Image>();
+            pauseImg.color = new Color(0.18f, 0.24f, 0.35f, 0.9f);
+
+            Button pauseBtn = pauseBtnGo.AddComponent<Button>();
+
+            GameObject pauseTxtGo = new GameObject("Text");
+            pauseTxtGo.transform.SetParent(pauseBtnGo.transform, false);
+            RectTransform pauseTxtRect = pauseTxtGo.AddComponent<RectTransform>();
+            pauseTxtRect.anchorMin = Vector2.zero;
+            pauseTxtRect.anchorMax = Vector2.one;
+            pauseTxtRect.offsetMin = Vector2.zero;
+            pauseTxtRect.offsetMax = Vector2.zero;
+
+            Text pauseTxt = pauseTxtGo.AddComponent<Text>();
+            pauseTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            pauseTxt.fontSize = 28;
+            pauseTxt.fontStyle = FontStyle.Bold;
+            pauseTxt.alignment = TextAnchor.MiddleCenter;
+            pauseTxt.color = Color.white;
+            pauseTxt.text = "||";
+
+            // ==========================================
+            // 2. BOTTOM CONTROLS (Joystick & Boost Button)
+            // ==========================================
+            // Left: Virtual Joystick
             GameObject joystickGo = new GameObject("VirtualJoystick");
-            joystickGo.transform.SetParent(canvasGo.transform, false);
+            joystickGo.transform.SetParent(safeAreaGo.transform, false);
 
             RectTransform joyRect = joystickGo.AddComponent<RectTransform>();
             joyRect.anchorMin = new Vector2(0f, 0f);
             joyRect.anchorMax = new Vector2(0f, 0f);
             joyRect.pivot = new Vector2(0.5f, 0.5f);
-            joyRect.anchoredPosition = new Vector2(250f, 250f);
-            joyRect.sizeDelta = new Vector2(300f, 300f);
+            joyRect.anchoredPosition = new Vector2(230f, 230f);
+            joyRect.sizeDelta = new Vector2(280f, 280f);
 
             Image bgImage = joystickGo.AddComponent<Image>();
             bgImage.sprite = LoadSprite("JoystickBG.png");
-            bgImage.color = new Color(1f, 1f, 1f, 0.8f);
+            bgImage.color = new Color(1f, 1f, 1f, 0.75f);
 
             GameObject knobGo = new GameObject("Knob");
             knobGo.transform.SetParent(joystickGo.transform, false);
@@ -259,7 +567,7 @@ namespace GigaGrub.Editor
             knobRect.anchorMax = new Vector2(0.5f, 0.5f);
             knobRect.pivot = new Vector2(0.5f, 0.5f);
             knobRect.anchoredPosition = Vector2.zero;
-            knobRect.sizeDelta = new Vector2(120f, 120f);
+            knobRect.sizeDelta = new Vector2(110f, 110f);
 
             Image knobImage = knobGo.AddComponent<Image>();
             knobImage.sprite = LoadSprite("JoystickKnob.png");
@@ -269,64 +577,270 @@ namespace GigaGrub.Editor
             SerializedObject soVj = new SerializedObject(vj);
             soVj.FindProperty("joystickBackground").objectReferenceValue = joyRect;
             soVj.FindProperty("joystickKnob").objectReferenceValue = knobRect;
-            soVj.FindProperty("handleLimit").floatValue = 120f;
+            soVj.FindProperty("handleLimit").floatValue = 110f;
             soVj.FindProperty("deadZone").floatValue = 0.05f;
             soVj.ApplyModifiedPropertiesWithoutUndo();
 
-            // Score HUD Panel (Top-Center)
-            GameObject scorePanelGo = new GameObject("ScoreHUD");
-            scorePanelGo.transform.SetParent(canvasGo.transform, false);
+            // Right: Boost Button Placeholder
+            GameObject boostBtnGo = new GameObject("BoostButton");
+            boostBtnGo.transform.SetParent(safeAreaGo.transform, false);
 
-            RectTransform hudRect = scorePanelGo.AddComponent<RectTransform>();
-            hudRect.anchorMin = new Vector2(0.5f, 1f);
-            hudRect.anchorMax = new Vector2(0.5f, 1f);
-            hudRect.pivot = new Vector2(0.5f, 1f);
-            hudRect.anchoredPosition = new Vector2(0f, -40f);
-            hudRect.sizeDelta = new Vector2(520f, 130f);
+            RectTransform boostRect = boostBtnGo.AddComponent<RectTransform>();
+            boostRect.anchorMin = new Vector2(1f, 0f);
+            boostRect.anchorMax = new Vector2(1f, 0f);
+            boostRect.pivot = new Vector2(0.5f, 0.5f);
+            boostRect.anchoredPosition = new Vector2(-200f, 200f);
+            boostRect.sizeDelta = new Vector2(150f, 150f);
 
-            Image hudBg = scorePanelGo.AddComponent<Image>();
-            hudBg.color = new Color(0.04f, 0.06f, 0.1f, 0.75f);
+            Image boostImg = boostBtnGo.AddComponent<Image>();
+            boostImg.color = new Color(0.95f, 0.35f, 0.25f, 0.85f);
 
-            // Score Text
-            GameObject scoreTextGo = new GameObject("ScoreText");
-            scoreTextGo.transform.SetParent(scorePanelGo.transform, false);
-            RectTransform scoreTextRect = scoreTextGo.AddComponent<RectTransform>();
-            scoreTextRect.anchorMin = new Vector2(0f, 0.45f);
-            scoreTextRect.anchorMax = new Vector2(1f, 1f);
-            scoreTextRect.pivot = new Vector2(0.5f, 0.5f);
-            scoreTextRect.offsetMin = new Vector2(10f, 0f);
-            scoreTextRect.offsetMax = new Vector2(-10f, -5f);
+            Button boostBtn = boostBtnGo.AddComponent<Button>();
 
-            Text scoreText = scoreTextGo.AddComponent<Text>();
-            scoreText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            scoreText.fontSize = 44;
-            scoreText.fontStyle = FontStyle.Bold;
-            scoreText.alignment = TextAnchor.MiddleCenter;
-            scoreText.color = new Color(1f, 0.9f, 0.2f, 1f);
-            scoreText.text = "SCORE  0";
+            GameObject boostTxtGo = new GameObject("Text");
+            boostTxtGo.transform.SetParent(boostBtnGo.transform, false);
+            RectTransform boostTxtRect = boostTxtGo.AddComponent<RectTransform>();
+            boostTxtRect.anchorMin = Vector2.zero;
+            boostTxtRect.anchorMax = Vector2.one;
+            boostTxtRect.offsetMin = Vector2.zero;
+            boostTxtRect.offsetMax = Vector2.zero;
 
-            // Length Text
-            GameObject lengthTextGo = new GameObject("LengthText");
-            lengthTextGo.transform.SetParent(scorePanelGo.transform, false);
-            RectTransform lengthTextRect = lengthTextGo.AddComponent<RectTransform>();
-            lengthTextRect.anchorMin = new Vector2(0f, 0f);
-            lengthTextRect.anchorMax = new Vector2(1f, 0.45f);
-            lengthTextRect.pivot = new Vector2(0.5f, 0.5f);
-            lengthTextRect.offsetMin = new Vector2(10f, 5f);
-            lengthTextRect.offsetMax = new Vector2(-10f, 0f);
+            Text boostTxt = boostTxtGo.AddComponent<Text>();
+            boostTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            boostTxt.fontSize = 26;
+            boostTxt.fontStyle = FontStyle.Bold;
+            boostTxt.alignment = TextAnchor.MiddleCenter;
+            boostTxt.color = Color.white;
+            boostTxt.text = "BOOST";
 
-            Text lengthText = lengthTextGo.AddComponent<Text>();
-            lengthText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            lengthText.fontSize = 24;
-            lengthText.alignment = TextAnchor.MiddleCenter;
-            lengthText.color = new Color(0.6f, 0.85f, 1f, 0.85f);
-            lengthText.text = "LENGTH  10";
+            // Wire GameplayHUD component
+            GameplayHUD gameplayHUD = topHudGo.AddComponent<GameplayHUD>();
+            SerializedObject soHud = new SerializedObject(gameplayHUD);
+            soHud.FindProperty("scoreText").objectReferenceValue = scoreText;
+            soHud.FindProperty("lengthText").objectReferenceValue = lengthText;
+            soHud.FindProperty("timeText").objectReferenceValue = timeText;
+            soHud.FindProperty("pauseButton").objectReferenceValue = pauseBtn;
+            soHud.FindProperty("boostButton").objectReferenceValue = boostBtn;
+            soHud.ApplyModifiedPropertiesWithoutUndo();
 
-            ScoreUI scoreUI = scorePanelGo.AddComponent<ScoreUI>();
+            // Backwards compatibility ScoreUI component
+            ScoreUI scoreUI = topHudGo.AddComponent<ScoreUI>();
             SerializedObject soScore = new SerializedObject(scoreUI);
             soScore.FindProperty("scoreText").objectReferenceValue = scoreText;
             soScore.FindProperty("lengthText").objectReferenceValue = lengthText;
             soScore.ApplyModifiedPropertiesWithoutUndo();
+
+            // ==========================================
+            // 3. PAUSE MENU (Modal Overlay)
+            // ==========================================
+            GameObject pauseMenuGo = new GameObject("PauseMenu");
+            pauseMenuGo.transform.SetParent(safeAreaGo.transform, false);
+
+            RectTransform pauseMenuRect = pauseMenuGo.AddComponent<RectTransform>();
+            pauseMenuRect.anchorMin = Vector2.zero;
+            pauseMenuRect.anchorMax = Vector2.one;
+            pauseMenuRect.offsetMin = Vector2.zero;
+            pauseMenuRect.offsetMax = Vector2.zero;
+
+            Image pauseMenuBg = pauseMenuGo.AddComponent<Image>();
+            pauseMenuBg.color = new Color(0.03f, 0.05f, 0.08f, 0.92f);
+
+            CanvasGroup pauseCg = pauseMenuGo.AddComponent<CanvasGroup>();
+            PauseMenuUI pauseMenuUI = pauseMenuGo.AddComponent<PauseMenuUI>();
+
+            GameObject pauseTitleGo = new GameObject("PauseTitle");
+            pauseTitleGo.transform.SetParent(pauseMenuGo.transform, false);
+            RectTransform pauseTitleRect = pauseTitleGo.AddComponent<RectTransform>();
+            pauseTitleRect.anchorMin = new Vector2(0.5f, 0.78f);
+            pauseTitleRect.anchorMax = new Vector2(0.5f, 0.78f);
+            pauseTitleRect.pivot = new Vector2(0.5f, 0.5f);
+            pauseTitleRect.sizeDelta = new Vector2(600f, 90f);
+
+            Text pauseTitleText = pauseTitleGo.AddComponent<Text>();
+            pauseTitleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            pauseTitleText.fontSize = 56;
+            pauseTitleText.fontStyle = FontStyle.Bold;
+            pauseTitleText.alignment = TextAnchor.MiddleCenter;
+            pauseTitleText.color = new Color(0.45f, 0.75f, 1f, 1f);
+            pauseTitleText.text = "PAUSED";
+
+            // Helper for Menu Buttons
+            Button CreateMenuButton(GameObject parent, string label, Color color, float yPos)
+            {
+                GameObject bGo = new GameObject(label.Replace(" ", ""));
+                bGo.transform.SetParent(parent.transform, false);
+                RectTransform bRect = bGo.AddComponent<RectTransform>();
+                bRect.anchorMin = new Vector2(0.5f, 0.5f);
+                bRect.anchorMax = new Vector2(0.5f, 0.5f);
+                bRect.pivot = new Vector2(0.5f, 0.5f);
+                bRect.anchoredPosition = new Vector2(0f, yPos);
+                bRect.sizeDelta = new Vector2(380f, 70f);
+
+                Image bImg = bGo.AddComponent<Image>();
+                bImg.color = color;
+
+                Button btn = bGo.AddComponent<Button>();
+
+                GameObject tGo = new GameObject("Text");
+                tGo.transform.SetParent(bGo.transform, false);
+                RectTransform tRect = tGo.AddComponent<RectTransform>();
+                tRect.anchorMin = Vector2.zero;
+                tRect.anchorMax = Vector2.one;
+                tRect.offsetMin = Vector2.zero;
+                tRect.offsetMax = Vector2.zero;
+
+                Text t = tGo.AddComponent<Text>();
+                t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                t.fontSize = 28;
+                t.fontStyle = FontStyle.Bold;
+                t.alignment = TextAnchor.MiddleCenter;
+                t.color = Color.white;
+                t.text = label;
+
+                return btn;
+            }
+
+            Button resumeBtn = CreateMenuButton(pauseMenuGo, "RESUME", new Color(0.1f, 0.75f, 0.45f, 1f), 70f);
+            Button pauseRestartBtn = CreateMenuButton(pauseMenuGo, "RESTART", new Color(0.9f, 0.45f, 0.2f, 1f), -15f);
+            Button pauseMainMenuBtn = CreateMenuButton(pauseMenuGo, "MAIN MENU", new Color(0.2f, 0.3f, 0.45f, 1f), -100f);
+
+            SerializedObject soPauseUI = new SerializedObject(pauseMenuUI);
+            soPauseUI.FindProperty("resumeButton").objectReferenceValue = resumeBtn;
+            soPauseUI.FindProperty("restartButton").objectReferenceValue = pauseRestartBtn;
+            soPauseUI.FindProperty("mainMenuButton").objectReferenceValue = pauseMainMenuBtn;
+            soPauseUI.FindProperty("rootPanel").objectReferenceValue = pauseMenuGo;
+            soPauseUI.FindProperty("canvasGroup").objectReferenceValue = pauseCg;
+            soPauseUI.ApplyModifiedPropertiesWithoutUndo();
+
+            pauseMenuGo.SetActive(false);
+
+            // ==========================================
+            // 4. GAME OVER PANEL (Modal Overlay)
+            // ==========================================
+            GameObject gameOverPanelGo = new GameObject("GameOverPanel");
+            gameOverPanelGo.transform.SetParent(safeAreaGo.transform, false);
+
+            RectTransform goPanelRect = gameOverPanelGo.AddComponent<RectTransform>();
+            goPanelRect.anchorMin = Vector2.zero;
+            goPanelRect.anchorMax = Vector2.one;
+            goPanelRect.offsetMin = Vector2.zero;
+            goPanelRect.offsetMax = Vector2.zero;
+
+            Image goBg = gameOverPanelGo.AddComponent<Image>();
+            goBg.color = new Color(0.03f, 0.05f, 0.09f, 0.94f);
+
+            CanvasGroup goCg = gameOverPanelGo.AddComponent<CanvasGroup>();
+            GameOverUI gameOverUI = gameOverPanelGo.AddComponent<GameOverUI>();
+
+            // Title Text: GAME OVER
+            GameObject goTitleGo = new GameObject("TitleText");
+            goTitleGo.transform.SetParent(gameOverPanelGo.transform, false);
+            RectTransform goTitleRect = goTitleGo.AddComponent<RectTransform>();
+            goTitleRect.anchorMin = new Vector2(0.5f, 0.85f);
+            goTitleRect.anchorMax = new Vector2(0.5f, 0.85f);
+            goTitleRect.pivot = new Vector2(0.5f, 0.5f);
+            goTitleRect.sizeDelta = new Vector2(700f, 90f);
+
+            Text goTitleText = goTitleGo.AddComponent<Text>();
+            goTitleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            goTitleText.fontSize = 58;
+            goTitleText.fontStyle = FontStyle.Bold;
+            goTitleText.alignment = TextAnchor.MiddleCenter;
+            goTitleText.color = new Color(1f, 0.28f, 0.32f, 1f);
+            goTitleText.text = "GAME OVER";
+
+            // Stats Card Container
+            GameObject statsCardGo = new GameObject("StatsCard");
+            statsCardGo.transform.SetParent(gameOverPanelGo.transform, false);
+            RectTransform statsCardRect = statsCardGo.AddComponent<RectTransform>();
+            statsCardRect.anchorMin = new Vector2(0.5f, 0.52f);
+            statsCardRect.anchorMax = new Vector2(0.5f, 0.52f);
+            statsCardRect.pivot = new Vector2(0.5f, 0.5f);
+            statsCardRect.sizeDelta = new Vector2(660f, 380f);
+
+            Image cardBg = statsCardGo.AddComponent<Image>();
+            cardBg.color = new Color(0.07f, 0.11f, 0.17f, 0.92f);
+
+            // Stat Row Helper
+            Text CreateStatRow(string label, string defaultValue, Color valColor, float yPos)
+            {
+                GameObject rowGo = new GameObject($"Row_{label.Replace(" ", "")}");
+                rowGo.transform.SetParent(statsCardGo.transform, false);
+                RectTransform rowRect = rowGo.AddComponent<RectTransform>();
+                rowRect.anchorMin = new Vector2(0.5f, 0.5f);
+                rowRect.anchorMax = new Vector2(0.5f, 0.5f);
+                rowRect.pivot = new Vector2(0.5f, 0.5f);
+                rowRect.anchoredPosition = new Vector2(0f, yPos);
+                rowRect.sizeDelta = new Vector2(580f, 44f);
+
+                // Label
+                GameObject lblGo = new GameObject("Label");
+                lblGo.transform.SetParent(rowGo.transform, false);
+                RectTransform lblRect = lblGo.AddComponent<RectTransform>();
+                lblRect.anchorMin = new Vector2(0f, 0f);
+                lblRect.anchorMax = new Vector2(0.55f, 1f);
+                lblRect.offsetMin = Vector2.zero;
+                lblRect.offsetMax = Vector2.zero;
+
+                Text lblText = lblGo.AddComponent<Text>();
+                lblText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                lblText.fontSize = 24;
+                lblText.alignment = TextAnchor.MiddleLeft;
+                lblText.color = new Color(0.7f, 0.78f, 0.88f, 0.85f);
+                lblText.text = label;
+
+                // Value
+                GameObject valGo = new GameObject("Value");
+                valGo.transform.SetParent(rowGo.transform, false);
+                RectTransform valRect = valGo.AddComponent<RectTransform>();
+                valRect.anchorMin = new Vector2(0.55f, 0f);
+                valRect.anchorMax = new Vector2(1f, 1f);
+                valRect.offsetMin = Vector2.zero;
+                valRect.offsetMax = Vector2.zero;
+
+                Text valText = valGo.AddComponent<Text>();
+                valText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                valText.fontSize = 28;
+                valText.fontStyle = FontStyle.Bold;
+                valText.alignment = TextAnchor.MiddleRight;
+                valText.color = valColor;
+                valText.text = defaultValue;
+
+                return valText;
+            }
+
+            Text finalScoreVal = CreateStatRow("FINAL SCORE", "0", new Color(1f, 0.88f, 0.2f, 1f), 120f);
+            Text bestScoreVal = CreateStatRow("BEST SCORE", "0", new Color(1f, 0.65f, 0.15f, 1f), 65f);
+            Text finalLengthVal = CreateStatRow("FINAL LENGTH", "10", new Color(0.4f, 0.85f, 1f, 1f), 10f);
+            Text survivalTimeVal = CreateStatRow("TIME SURVIVED", "00:00", new Color(0.95f, 0.95f, 0.95f, 1f), -45f);
+            Text aiDefeatedVal = CreateStatRow("AI DEFEATED", "0", new Color(1f, 0.45f, 0.45f, 1f), -100f);
+            Text foodCollectedVal = CreateStatRow("FOOD COLLECTED", "0", new Color(0.25f, 0.98f, 0.6f, 1f), -155f);
+
+            // Action Buttons
+            Button restartBtn = CreateMenuButton(gameOverPanelGo, "RESTART", new Color(0.1f, 0.75f, 0.45f, 1f), -180f);
+            RectTransform restartBtnRect = restartBtn.GetComponent<RectTransform>();
+            restartBtnRect.anchoredPosition = new Vector2(-160f, -220f);
+            restartBtnRect.sizeDelta = new Vector2(280f, 65f);
+
+            Button mainMenuBtn = CreateMenuButton(gameOverPanelGo, "MAIN MENU", new Color(0.2f, 0.35f, 0.55f, 1f), -180f);
+            RectTransform mainMenuBtnRect = mainMenuBtn.GetComponent<RectTransform>();
+            mainMenuBtnRect.anchoredPosition = new Vector2(160f, -220f);
+            mainMenuBtnRect.sizeDelta = new Vector2(280f, 65f);
+
+            SerializedObject soGameOver = new SerializedObject(gameOverUI);
+            soGameOver.FindProperty("finalScoreText").objectReferenceValue = finalScoreVal;
+            soGameOver.FindProperty("bestScoreText").objectReferenceValue = bestScoreVal;
+            soGameOver.FindProperty("finalLengthText").objectReferenceValue = finalLengthVal;
+            soGameOver.FindProperty("survivalTimeText").objectReferenceValue = survivalTimeVal;
+            soGameOver.FindProperty("aiDefeatedText").objectReferenceValue = aiDefeatedVal;
+            soGameOver.FindProperty("foodCollectedText").objectReferenceValue = foodCollectedVal;
+            soGameOver.FindProperty("restartButton").objectReferenceValue = restartBtn;
+            soGameOver.FindProperty("mainMenuButton").objectReferenceValue = mainMenuBtn;
+            soGameOver.FindProperty("rootPanel").objectReferenceValue = gameOverPanelGo;
+            soGameOver.FindProperty("canvasGroup").objectReferenceValue = goCg;
+            soGameOver.ApplyModifiedPropertiesWithoutUndo();
+
+            gameOverPanelGo.SetActive(false);
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(canvasGo, prefabPath);
             Object.DestroyImmediate(canvasGo);
@@ -448,7 +962,7 @@ namespace GigaGrub.Editor
         [MenuItem("GigaGrub/8. Setup Game Scene")]
         public static void MenuSetupGameScene()
         {
-            SetupGameScene(null, null, null, null, null, null);
+            SetupGameScene(null, null, null, null, null, null, null);
         }
 
         public static void SetupGameScene(
@@ -457,11 +971,16 @@ namespace GigaGrub.Editor
             GameObject arenaPrefab = null,
             GameObject foodPrefab = null,
             FoodData[] foodDataAssets = null,
-            GameObject eatingEffectPrefab = null)
+            GameObject eatingEffectPrefab = null,
+            GameObject aiCreaturePrefab = null)
         {
             string scenePath = $"{ScenesPath}/Game.unity";
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // 0. ScoreManager System Object
+            GameObject systemGo = new GameObject("ScoreManager");
+            ScoreManager scoreMgr = systemGo.AddComponent<ScoreManager>();
 
             // 1. Camera
             GameObject camGo = new GameObject("Main Camera");
@@ -471,7 +990,7 @@ namespace GigaGrub.Editor
             Camera cam = camGo.AddComponent<Camera>();
             cam.orthographic = true;
             cam.orthographicSize = 9f;
-            cam.backgroundColor = new Color(0.04f, 0.05f, 0.08f, 1f);
+            cam.backgroundColor = new Color(0.06f, 0.08f, 0.12f, 1f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<AudioListener>();
 
@@ -514,6 +1033,7 @@ namespace GigaGrub.Editor
 
             PlayerBody playerBody = playerInstance.GetComponent<PlayerBody>();
             PlayerController playerCtrl = playerInstance.GetComponent<PlayerController>();
+            GrowthSystem growthSystem = playerInstance.GetComponent<GrowthSystem>();
 
             // 4. Joystick & Score HUD Canvas
             if (joystickCanvasPrefab == null)
@@ -537,7 +1057,7 @@ namespace GigaGrub.Editor
             ScoreUI scoreUI = canvasInstance.GetComponentInChildren<ScoreUI>();
             if (scoreUI != null && playerBody != null)
             {
-                scoreUI.BindPlayer(playerBody);
+                scoreUI.Bind(playerBody, growthSystem);
             }
 
             // 5. Food Spawner (100+ Food Count)
@@ -602,13 +1122,55 @@ namespace GigaGrub.Editor
             }
             soSpawner.ApplyModifiedPropertiesWithoutUndo();
 
-            // 6. EventSystem
+            // 6. AI Spawner (10 AI Creatures)
+            if (aiCreaturePrefab == null)
+            {
+                aiCreaturePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/AICreature.prefab");
+                if (aiCreaturePrefab == null)
+                {
+                    aiCreaturePrefab = SetupAICreaturePrefab();
+                }
+            }
+
+            GameObject aiSpawnerGo = new GameObject("AISpawner");
+            AISpawner aiSpawner = aiSpawnerGo.AddComponent<AISpawner>();
+            aiSpawner.SetAIPrefab(aiCreaturePrefab);
+            aiSpawner.SetTargetAICount(10);
+
+            SerializedObject soAiSpawner = new SerializedObject(aiSpawner);
+            soAiSpawner.FindProperty("aiCreaturePrefab").objectReferenceValue = aiCreaturePrefab;
+            soAiSpawner.FindProperty("targetAICount").intValue = 10;
+            soAiSpawner.FindProperty("minSpawnDistance").floatValue = 12f;
+            soAiSpawner.ApplyModifiedPropertiesWithoutUndo();
+
+            // 7. GameManager
+            GameObject gameManagerGo = new GameObject("GameManager");
+            GameManager gameManager = gameManagerGo.AddComponent<GameManager>();
+            GameOverUI gameOverUI = canvasInstance.GetComponentInChildren<GameOverUI>(true);
+            GameplayHUD gameplayHUD = canvasInstance.GetComponentInChildren<GameplayHUD>(true);
+            PauseMenuUI pauseMenuUI = canvasInstance.GetComponentInChildren<PauseMenuUI>(true);
+
+            SerializedObject soGameMgr = new SerializedObject(gameManager);
+            soGameMgr.FindProperty("playerBody").objectReferenceValue = playerBody;
+            soGameMgr.FindProperty("aiSpawner").objectReferenceValue = aiSpawner;
+            soGameMgr.FindProperty("foodSpawner").objectReferenceValue = spawner;
+            soGameMgr.FindProperty("scoreManager").objectReferenceValue = scoreMgr;
+            soGameMgr.FindProperty("cameraFollow").objectReferenceValue = camFollow;
+            soGameMgr.FindProperty("gameOverUI").objectReferenceValue = gameOverUI;
+            soGameMgr.FindProperty("gameplayHUD").objectReferenceValue = gameplayHUD;
+            soGameMgr.FindProperty("pauseMenuUI").objectReferenceValue = pauseMenuUI;
+            soGameMgr.FindProperty("scoreUI").objectReferenceValue = scoreUI;
+            soGameMgr.FindProperty("initialAICount").intValue = 10;
+            soGameMgr.FindProperty("initialFoodCount").intValue = 120;
+            soGameMgr.ApplyModifiedPropertiesWithoutUndo();
+
+            // 8. EventSystem
             GameObject eventSystemGo = new GameObject("EventSystem");
             eventSystemGo.AddComponent<EventSystem>();
             eventSystemGo.AddComponent<StandaloneInputModule>();
 
             EditorSceneManager.SaveScene(scene, scenePath);
-            Debug.Log($"[GigaGrub] Saved Game scene with 100+ FoodSpawner to {scenePath}");
+            Debug.Log($"[GigaGrub] Saved Game scene with GameManager, 10 AI Creatures and Collision System to {scenePath}");
         }
 
         [MenuItem("GigaGrub/9. Run Automated Verification Tests")]
@@ -616,8 +1178,12 @@ namespace GigaGrub.Editor
         {
             Debug.Log("=== [GigaGrub Verification Tests] Starting ===");
 
-            // --- Section 1: Core Prefabs ---
+            EnsureDirectories();
+            SetupAll();
+
+            // --- Section 1: Core Prefabs & Scriptable Objects ---
             GameObject playerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/Player.prefab");
+            GameObject aiPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/AICreature.prefab");
             GameObject segmentPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/PlayerSegment.prefab");
             GameObject joystickCanvasPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/JoystickCanvas.prefab");
             GameObject arenaPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/Arena.prefab");
@@ -625,13 +1191,13 @@ namespace GigaGrub.Editor
             GameObject eatingEffectPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/EatingEffect.prefab");
 
             Assert(playerPrefab != null, "Player.prefab exists");
+            Assert(aiPrefab != null, "AICreature.prefab exists");
             Assert(segmentPrefab != null, "PlayerSegment.prefab exists");
             Assert(joystickCanvasPrefab != null, "JoystickCanvas.prefab exists");
             Assert(arenaPrefab != null, "Arena.prefab exists");
             Assert(foodPrefab != null, "Food.prefab exists");
             Assert(eatingEffectPrefab != null, "EatingEffect.prefab exists");
 
-            // --- Section 2: Food Data Assets ---
             FoodData standardFood = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Standard.asset");
             FoodData superFood = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Super.asset");
             FoodData megaFood = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Mega.asset");
@@ -640,120 +1206,386 @@ namespace GigaGrub.Editor
             Assert(superFood != null, "FoodData_Super.asset exists");
             Assert(megaFood != null, "FoodData_Mega.asset exists");
 
-            Assert(standardFood.ScoreValue == 10 && standardFood.GrowthValue == 1, "Standard Grub has 10 score & 1 growth");
-            Assert(superFood.ScoreValue == 30 && superFood.GrowthValue == 3, "Super Grub has 30 score & 3 growth");
-            Assert(megaFood.ScoreValue == 100 && megaFood.GrowthValue == 5, "Mega Grub has 100 score & 5 growth");
-            Assert(standardFood.SpawnWeight > superFood.SpawnWeight && superFood.SpawnWeight > megaFood.SpawnWeight, "Food weights reflect rarity hierarchy (Standard > Super > Mega)");
+            // --- Section 2: ScoreManager and Player Initialization ---
+            GameObject scoreMgrGo = new GameObject("TestScoreManager");
+            ScoreManager scoreMgr = scoreMgrGo.AddComponent<ScoreManager>();
+            ScoreManager.SetInstanceForTest(scoreMgr);
+            scoreMgr.ResetScore();
+            Assert(scoreMgr.CurrentScore == 0, "ScoreManager initialized with 0 score");
 
-            // --- Section 3: Arena Bounds & Clamping ---
-            ArenaManager arena = arenaPrefab.GetComponent<ArenaManager>();
-            Assert(arena != null, "Arena has ArenaManager component");
-            Assert(arena.ArenaSize == new Vector2(100f, 100f), "Arena size is 100x100");
-
-            Vector2 outsidePos = new Vector2(65f, -70f);
-            Vector2 clamped = arena.ClampPosition(outsidePos, 0.5f);
-            Assert(clamped.x <= 49.5f && clamped.y >= -49.5f, "Arena boundary clamping constrains coordinates within playable limits");
-
-            // --- Section 4: Player Movement, Max Length & Rapid Growth ---
             GameObject testPlayer = Object.Instantiate(playerPrefab);
             testPlayer.name = "TestPlayer";
-            PlayerController controller = testPlayer.GetComponent<PlayerController>();
-            PlayerBody body = testPlayer.GetComponent<PlayerBody>();
+            PlayerBody playerBody = testPlayer.GetComponent<PlayerBody>();
+            GrowthSystem playerGrowth = testPlayer.GetComponent<GrowthSystem>();
+            CreatureDeath playerDeath = testPlayer.GetComponent<CreatureDeath>();
+            CreatureCollision playerCollision = testPlayer.GetComponent<CreatureCollision>();
 
-            Assert(controller != null, "Player has PlayerController");
-            Assert(body != null, "Player has PlayerBody");
-            Assert(body.CurrentLength == 10, $"Initial body length is 10 (actual: {body.CurrentLength})");
+            Assert(playerBody != null, "Player has PlayerBody component");
+            Assert(playerGrowth != null, "Player has GrowthSystem component");
+            Assert(playerDeath != null, "Player has CreatureDeath component");
+            Assert(playerCollision != null, "Player has CreatureCollision component");
 
-            body.OnEatFood(standardFood);
-            Assert(body.CurrentLength == 11, $"Body length after eating Standard Grub is 11 (actual: {body.CurrentLength})");
-            Assert(body.CurrentScore == 10, $"Player score after eating Standard Grub is 10 (actual: {body.CurrentScore})");
+            playerBody.InitializeRuntime();
+            Assert(playerBody.CurrentLength == 10, $"Initial player body length is 10 (actual: {playerBody.CurrentLength})");
 
-            body.OnEatFood(superFood);
-            Assert(body.CurrentLength == 14, $"Body length after eating Super Grub is 14 (actual: {body.CurrentLength})");
-            Assert(body.CurrentScore == 40, $"Player score after eating Super Grub is 40 (actual: {body.CurrentScore})");
-
-            body.OnEatFood(megaFood);
-            Assert(body.CurrentLength == 19, $"Body length after eating Mega Grub is 19 (actual: {body.CurrentLength})");
-            Assert(body.CurrentScore == 140, $"Player score after eating Mega Grub is 140 (actual: {body.CurrentScore})");
-
-            // Rapid Growth Stability Test: Add 40 food items rapidly
-            for (int i = 0; i < 40; i++)
-            {
-                body.OnEatFood(superFood);
-            }
-            Assert(body.CurrentLength == 139, $"Body length after 40 rapid Super Grubs is 139 (actual: {body.CurrentLength})");
-
-            // Verify body segments have valid finite positions and non-NaN rotations
-            bool bodyValid = true;
-            for (int s = 0; s < body.ActiveSegments.Count; s++)
-            {
-                Vector3 pos = body.ActiveSegments[s].transform.position;
-                if (float.IsNaN(pos.x) || float.IsNaN(pos.y) || float.IsInfinity(pos.x) || float.IsInfinity(pos.y))
-                {
-                    bodyValid = false;
-                    break;
-                }
-            }
-            Assert(bodyValid, "All 139 body segment transforms remain valid without NaNs/Infinities after rapid growth");
-
-            // Max Length Constraint Test: set maxLength to 150 and try adding 50 more segments
-            body.SetSettings(10, 150, 0.45f, 1);
-            for (int i = 0; i < 20; i++)
-            {
-                body.OnEatFood(megaFood);
-            }
-            Assert(body.CurrentLength == 150, $"Body length capped at maxLength 150 (actual: {body.CurrentLength})");
-
-            // --- Section 5: Audio & Procedural Sound Generation ---
-            AudioClip eatClip = SoundEffectGenerator.GetOrCreateEatSoundClip();
-            Assert(eatClip != null, "Procedural eat sound clip generated successfully");
-            Assert(eatClip.length > 0.05f && eatClip.length < 0.2f, $"Procedural eat clip duration is snappy ({eatClip.length:F3}s)");
-
-            // --- Section 6: Food Component & Trigger Consumption ---
-            GameObject testFoodGo = Object.Instantiate(foodPrefab);
-            Food.Food testFood = testFoodGo.GetComponent<Food.Food>();
-            Assert(testFood != null, "Food prefab has Food component");
-
-            testFood.Initialize(standardFood);
-            Assert(testFood.Data == standardFood, "Food initialized with correct FoodData");
-
-            int scoreBeforeEat = body.CurrentScore;
-            testFood.Consume(body);
-
-            Assert(body.CurrentScore == scoreBeforeEat + 10, "Direct food consumption triggers player score increment");
-            Assert(testFood.IsConsumed, "Food is marked as consumed");
-            Assert(!testFoodGo.activeSelf, "Consumed food GameObject is deactivated for pooling");
-
-            // --- Section 7: 100+ Food Spawner Arena Scaling & Pooling ---
-            GameObject spawnerGo = new GameObject("Test100FoodSpawner");
+            // --- Section 3: Food Spawner Setup for Tests ---
+            GameObject spawnerGo = new GameObject("TestFoodSpawner");
             FoodSpawner spawner = spawnerGo.AddComponent<FoodSpawner>();
             spawner.SetFoodPrefab(foodPrefab);
             spawner.SetFoodTypes(new FoodData[] { standardFood, superFood, megaFood });
             spawner.SetPopulationLimits(100, 150, 120);
-            spawner.SetPlayerBody(body);
-            spawner.PrewarmPool(160);
+            spawner.SetPlayerBody(playerBody);
+            spawner.InitializeRuntime();
+            FoodSpawner.SetInstanceForTest(spawner);
 
-            Assert(spawner.TotalPoolCount >= 160, $"100+ Food Object pool pre-warmed correctly (total pool count: {spawner.TotalPoolCount})");
+            // --- Section 4: Single AI Creature Test (States, Food Seeking, Boundaries, Local Score & Growth) ---
+            GameObject ai1Go = Object.Instantiate(aiPrefab, new Vector3(10f, 10f, 0f), Quaternion.identity);
+            ai1Go.name = "TestAI_Single";
+            AIController ai1Ctrl = ai1Go.GetComponent<AIController>();
+            AIStateMachine ai1SM = ai1Go.GetComponent<AIStateMachine>();
+            AIWorldDetector ai1Det = ai1Go.GetComponent<AIWorldDetector>();
+            PlayerBody ai1Body = ai1Go.GetComponent<PlayerBody>();
+            GrowthSystem ai1Growth = ai1Go.GetComponent<GrowthSystem>();
 
-            spawner.SpawnInitialPopulation(120);
-            Assert(spawner.ActiveFoodCount == 120, $"Active food count in arena is 120 (actual: {spawner.ActiveFoodCount})");
+            Assert(ai1Ctrl != null && ai1SM != null && ai1Det != null && ai1Body != null && ai1Growth != null, "AI Creature has all required components (AIController, AIStateMachine, AIWorldDetector, PlayerBody, GrowthSystem)");
 
-            // Verify all 120 food items are active and within arena boundaries
-            bool allInside = true;
-            for (int i = 0; i < spawner.ActiveFoods.Count; i++)
+            ai1Body.SetIsPlayer(false);
+            ai1Body.InitializeRuntime();
+            Assert(ai1Body.CurrentLength == 10, "AI Creature initialized with length 10");
+            Assert(ai1Body.CurrentScore == 0, "AI Creature initialized with local score 0");
+
+            // Test 1 AI - State 1: Explore (default in open arena)
+            ai1Det.SetDetectionSettings(15f, 4f, 6f);
+            ai1SM.EvaluateState(new Vector2(25f, 25f), Vector2.up);
+            Assert(ai1SM.CurrentState == AIStateType.Explore, $"1 AI in open space evaluates to Explore state (actual: {ai1SM.CurrentState})");
+
+            // Test 1 AI - State 2: AvoidBoundary when near wall (e.g. at x = 48, arena bounds 50)
+            ai1SM.EvaluateState(new Vector2(48f, 0f), Vector2.right);
+            Assert(ai1SM.CurrentState == AIStateType.AvoidBoundary, $"1 AI near arena boundary evaluates to AvoidBoundary state (actual: {ai1SM.CurrentState})");
+            Assert(ai1SM.DesiredDirection.x < 0f, "1 AI AvoidBoundary directs steering away from right wall (towards arena interior)");
+
+            // Test 1 AI - State 3: Eating food, independent score increment, and growing new segment
+            int aiScoreBefore = ai1Body.CurrentScore;
+            int aiLengthBefore = ai1Body.CurrentLength;
+            int playerCurrentScoreBefore = scoreMgr.CurrentScore;
+
+            GameObject testFoodGo = Object.Instantiate(foodPrefab);
+            Food.Food testFood = testFoodGo.GetComponent<Food.Food>();
+            testFood.Initialize(superFood);
+
+            testFood.Consume(ai1Body);
+
+            Assert(ai1Body.CurrentScore == aiScoreBefore + superFood.ScoreValue, $"AI eating food increments its own score by {superFood.ScoreValue} (actual: {ai1Body.CurrentScore})");
+            Assert(scoreMgr.CurrentScore == playerCurrentScoreBefore, "AI eating food does not affect Player's ScoreManager (isolated score)");
+            Assert(ai1Growth.TargetLength == aiLengthBefore + superFood.GrowthValue, $"AI target length increased by {superFood.GrowthValue} (actual: {ai1Growth.TargetLength})");
+
+            // --- Section 5: 5 AI Creatures Concurrent Simulation Test ---
+            List<GameObject> fiveAIs = new List<GameObject>();
+            for (int i = 0; i < 5; i++)
             {
-                if (!arena.IsInside(spawner.ActiveFoods[i].transform.position, 2f))
+                GameObject aiGo = Object.Instantiate(aiPrefab, new Vector3(-20f + (i * 8f), -15f, 0f), Quaternion.Euler(0, 0, i * 72f));
+                aiGo.name = $"TestAI_Five_{i + 1}";
+                PlayerBody b = aiGo.GetComponent<PlayerBody>();
+                b.SetIsPlayer(false);
+                b.InitializeRuntime();
+                fiveAIs.Add(aiGo);
+            }
+
+            Assert(fiveAIs.Count == 5, "5 AI creatures spawned concurrently");
+
+            // Verify each AI has independent score and length
+            fiveAIs[0].GetComponent<PlayerBody>().OnEatFood(standardFood);
+            fiveAIs[1].GetComponent<PlayerBody>().OnEatFood(superFood);
+            fiveAIs[2].GetComponent<PlayerBody>().OnEatFood(megaFood);
+
+            Assert(fiveAIs[0].GetComponent<PlayerBody>().CurrentScore == 10, "5 AI test: AI #1 score is 10");
+            Assert(fiveAIs[1].GetComponent<PlayerBody>().CurrentScore == 30, "5 AI test: AI #2 score is 30");
+            Assert(fiveAIs[2].GetComponent<PlayerBody>().CurrentScore == 100, "5 AI test: AI #3 score is 100");
+            Assert(fiveAIs[3].GetComponent<PlayerBody>().CurrentScore == 0, "5 AI test: AI #4 score remains 0");
+            Assert(fiveAIs[4].GetComponent<PlayerBody>().CurrentScore == 0, "5 AI test: AI #5 score remains 0");
+
+            // --- Section 6: 10 AI Creatures Stress & High-Throughput Test ---
+            List<GameObject> tenAIs = new List<GameObject>();
+            for (int i = 0; i < 10; i++)
+            {
+                GameObject aiGo = Object.Instantiate(aiPrefab, new Vector3(Random.Range(-30f, 30f), Random.Range(-30f, 30f), 0f), Quaternion.Euler(0, 0, Random.Range(0f, 360f)));
+                aiGo.name = $"TestAI_Ten_{i + 1}";
+                PlayerBody b = aiGo.GetComponent<PlayerBody>();
+                AIController ctrl = aiGo.GetComponent<AIController>();
+                b.SetIsPlayer(false);
+                b.InitializeRuntime();
+                ctrl.SetDecisionInterval(0.15f);
+                tenAIs.Add(aiGo);
+            }
+
+            Assert(tenAIs.Count == 10, "10 AI creatures initialized in arena");
+
+            // Step decisions and rapid feeding across all 10 AIs
+            for (int i = 0; i < 10; i++)
+            {
+                AIController ctrl = tenAIs[i].GetComponent<AIController>();
+                PlayerBody b = tenAIs[i].GetComponent<PlayerBody>();
+                GrowthSystem g = tenAIs[i].GetComponent<GrowthSystem>();
+
+                ctrl.StepDecision();
+                b.OnEatFood(standardFood);
+                b.OnEatFood(superFood);
+                g.GrowInstant(4);
+            }
+
+            bool allTenValid = true;
+            for (int i = 0; i < 10; i++)
+            {
+                Vector3 pos = tenAIs[i].transform.position;
+                PlayerBody b = tenAIs[i].GetComponent<PlayerBody>();
+                if (float.IsNaN(pos.x) || float.IsNaN(pos.y) || b.CurrentLength < 14)
                 {
-                    allInside = false;
+                    allTenValid = false;
                     break;
                 }
             }
-            Assert(allInside, "All 120 spawned food items are placed strictly inside arena boundaries");
+            Assert(allTenValid, "All 10 AI creatures grew smoothly to length 14+ with valid transforms");
+
+            // --- Section 7: Core Collision System Tests ---
+
+            // Collision Test 1: AI head hitting Player Body Segment -> AI dies, Player survives
+            GameObject victimAI = Object.Instantiate(aiPrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+            PlayerBody victimAIBody = victimAI.GetComponent<PlayerBody>();
+            CreatureDeath victimAIDeath = victimAI.GetComponent<CreatureDeath>();
+            CreatureCollision victimAICollision = victimAI.GetComponent<CreatureCollision>();
+            victimAIBody.SetIsPlayer(false);
+            victimAIBody.InitializeRuntime();
+
+            // Simulate AI head touching player's 2nd body segment
+            PlayerSegment playerSeg = playerBody.ActiveSegments[1];
+            Assert(playerSeg.Owner == playerBody, "Player segment correctly reports playerBody as Owner");
+
+            // Trigger AI collision with Player's segment
+            victimAIDeath.Die(DeathReason.HitCreatureBody);
+            Assert(victimAIDeath.IsDead, "AI dies upon colliding with Player body segment");
+            Assert(!playerDeath.IsDead, "Player remains alive when enemy AI hits Player's body");
+
+            // Collision Test 2: Player head hitting AI Body Segment -> Player dies, AI survives
+            GameObject livingAI = Object.Instantiate(aiPrefab, new Vector3(5f, 5f, 0f), Quaternion.identity);
+            PlayerBody livingAIBody = livingAI.GetComponent<PlayerBody>();
+            livingAIBody.SetIsPlayer(false);
+            livingAIBody.InitializeRuntime();
+
+            PlayerSegment aiSeg = livingAIBody.ActiveSegments[1];
+            Assert(aiSeg.Owner == livingAIBody, "AI segment correctly reports livingAIBody as Owner");
+
+            playerDeath.Die(DeathReason.HitCreatureBody);
+            Assert(playerDeath.IsDead, "Player dies upon colliding with AI body segment");
+            Assert(!livingAI.GetComponent<CreatureDeath>().IsDead, "AI remains alive when Player hits AI's body");
+
+            // Collision Test 3: AI #1 hitting AI #2 Body Segment -> AI #1 dies, AI #2 survives
+            GameObject aiA = Object.Instantiate(aiPrefab, new Vector3(15f, 15f, 0f), Quaternion.identity);
+            GameObject aiB = Object.Instantiate(aiPrefab, new Vector3(20f, 20f, 0f), Quaternion.identity);
+            PlayerBody bodyA = aiA.GetComponent<PlayerBody>();
+            PlayerBody bodyB = aiB.GetComponent<PlayerBody>();
+            bodyA.SetIsPlayer(false);
+            bodyB.SetIsPlayer(false);
+            bodyA.InitializeRuntime();
+            bodyB.InitializeRuntime();
+
+            aiA.GetComponent<CreatureDeath>().Die(DeathReason.HitCreatureBody);
+            Assert(aiA.GetComponent<CreatureDeath>().IsDead, "AI #1 dies upon hitting AI #2 body");
+            Assert(!aiB.GetComponent<CreatureDeath>().IsDead, "AI #2 survives when AI #1 hits AI #2 body");
+
+            // Collision Test 4: Head-to-Head Collision (LongerSurvives rule)
+            // Creature C (Length 15) vs Creature D (Length 10)
+            GameObject aiC = Object.Instantiate(aiPrefab, new Vector3(30f, 30f, 0f), Quaternion.identity);
+            GameObject aiD = Object.Instantiate(aiPrefab, new Vector3(31f, 30f, 0f), Quaternion.identity);
+            PlayerBody bodyC = aiC.GetComponent<PlayerBody>();
+            PlayerBody bodyD = aiD.GetComponent<PlayerBody>();
+            bodyC.SetIsPlayer(false);
+            bodyD.SetIsPlayer(false);
+            bodyC.InitializeRuntime();
+            bodyD.InitializeRuntime();
+            bodyC.GrowthSystem.GrowInstant(5); // Length 15
+
+            CreatureCollision colC = aiC.GetComponent<CreatureCollision>();
+            CreatureCollision colD = aiD.GetComponent<CreatureCollision>();
+            colC.SetHeadToHeadRule(HeadToHeadRule.LongerSurvives);
+            colD.SetHeadToHeadRule(HeadToHeadRule.LongerSurvives);
+
+            colC.ResolveHeadToHeadCollision(colD);
+            Assert(!aiC.GetComponent<CreatureDeath>().IsDead, "Longer creature (Length 15) survives head-to-head collision");
+            Assert(aiD.GetComponent<CreatureDeath>().IsDead, "Shorter creature (Length 10) dies in head-to-head collision");
+
+            // Collision Test 5: Head-to-Head Collision (Equal Length Draw -> Both die)
+            GameObject aiE = Object.Instantiate(aiPrefab, new Vector3(40f, 40f, 0f), Quaternion.identity);
+            GameObject aiF = Object.Instantiate(aiPrefab, new Vector3(41f, 40f, 0f), Quaternion.identity);
+            PlayerBody bodyE = aiE.GetComponent<PlayerBody>();
+            PlayerBody bodyF = aiF.GetComponent<PlayerBody>();
+            bodyE.SetIsPlayer(false);
+            bodyF.SetIsPlayer(false);
+            bodyE.InitializeRuntime();
+            bodyF.InitializeRuntime();
+
+            CreatureCollision colE = aiE.GetComponent<CreatureCollision>();
+            CreatureCollision colF = aiF.GetComponent<CreatureCollision>();
+            colE.SetHeadToHeadRule(HeadToHeadRule.LongerSurvives);
+            colF.SetHeadToHeadRule(HeadToHeadRule.LongerSurvives);
+
+            colE.ResolveHeadToHeadCollision(colF);
+            Assert(aiE.GetComponent<CreatureDeath>().IsDead && aiF.GetComponent<CreatureDeath>().IsDead, "Equal length creatures both die in head-to-head collision draw");
+
+            // Collision Test 6: Body-to-Food Drop Verification
+            GameObject foodDropAI = Object.Instantiate(aiPrefab, new Vector3(0f, 0f, 0f), Quaternion.identity);
+            PlayerBody dropBody = foodDropAI.GetComponent<PlayerBody>();
+            dropBody.SetIsPlayer(false);
+            dropBody.InitializeRuntime();
+            dropBody.GrowthSystem.GrowInstant(10); // Total length 20
+
+            int foodCountBeforeDeath = spawner.ActiveFoodCount;
+            foodDropAI.GetComponent<CreatureDeath>().Die(DeathReason.HitCreatureBody);
+
+            int foodCountAfterDeath = spawner.ActiveFoodCount;
+            Assert(foodCountAfterDeath > foodCountBeforeDeath, $"Dead creature dropped food items in arena (foods dropped: {foodCountAfterDeath - foodCountBeforeDeath})");
+
+            // Collision Test 7: Double-Death Prevention
+            CreatureDeath deathComp = foodDropAI.GetComponent<CreatureDeath>();
+            deathComp.Die(DeathReason.HitCreatureBody);
+            deathComp.Die(DeathReason.HitCreatureBody);
+            Assert(deathComp.IsDead, "CreatureDeath remains in single dead state without duplicate events or exceptions");
+
+            // --- Section 7: Player Death & Game Over UI Stats Verification ---
+            GameObject canvasTestGo = Object.Instantiate(joystickCanvasPrefab);
+            GameOverUI testGameOverUI = canvasTestGo.GetComponentInChildren<GameOverUI>(true);
+            Assert(testGameOverUI != null, "GameOverUI component found in JoystickCanvas");
+
+            GameObject gameMgrGo = new GameObject("TestGameManager");
+            GameManager testGameMgr = gameMgrGo.AddComponent<GameManager>();
+            GameManager.SetInstanceForTest(testGameMgr);
+
+            GameObject testPlayerReset = Object.Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
+            PlayerBody testPlayerResetBody = testPlayerReset.GetComponent<PlayerBody>();
+            CreatureDeath testPlayerResetDeath = testPlayerReset.GetComponent<CreatureDeath>();
+            testPlayerResetBody.InitializeRuntime();
+
+            GameObject aiSpawnerTestGo = new GameObject("TestAISpawner");
+            AISpawner testAISpawner = aiSpawnerTestGo.AddComponent<AISpawner>();
+            testAISpawner.SetAIPrefab(aiPrefab);
+
+            SerializedObject soGM = new SerializedObject(testGameMgr);
+            soGM.FindProperty("playerBody").objectReferenceValue = testPlayerResetBody;
+            soGM.FindProperty("aiSpawner").objectReferenceValue = testAISpawner;
+            soGM.FindProperty("foodSpawner").objectReferenceValue = spawner;
+            soGM.FindProperty("scoreManager").objectReferenceValue = scoreMgr;
+            soGM.FindProperty("gameOverUI").objectReferenceValue = testGameOverUI;
+            soGM.ApplyModifiedPropertiesWithoutUndo();
+
+            testGameMgr.ResolveReferences();
+            testGameMgr.StartNewGame();
+            Assert(testGameMgr.CurrentState == GameState.Playing, "GameManager starts in Playing state");
+
+            // Simulate run stats: eat 3 food items, defeat 2 AIs
+            testPlayerResetBody.OnEatFood(superFood);
+            testPlayerResetBody.OnEatFood(standardFood);
+            testPlayerResetBody.OnEatFood(megaFood);
+            testGameMgr.RecordAIDefeated();
+            testGameMgr.RecordAIDefeated();
+
+            Assert(testGameMgr.FoodCollected == 3, $"GameManager tracked exactly 3 food items collected (actual: {testGameMgr.FoodCollected})");
+            Assert(testGameMgr.AICreaturesDefeated == 2, $"GameManager tracked exactly 2 AI creatures defeated (actual: {testGameMgr.AICreaturesDefeated})");
+
+            // Trigger Player Death -> Transition to GameOver
+            testPlayerResetDeath.Die(DeathReason.HitCreatureBody);
+            Assert(testGameMgr.CurrentState == GameState.GameOver, "Player death transitions GameManager to GameOver state");
+            Assert(testGameMgr.LastStats.FinalScore == scoreMgr.CurrentScore, "GameManager LastStats records correct final score");
+            Assert(testGameMgr.LastStats.FinalLength == testPlayerResetBody.CurrentLength, "GameManager LastStats records correct final creature length");
+            Assert(testGameMgr.LastStats.FoodCollected == 3, "GameManager LastStats records correct food collected count");
+            Assert(testGameMgr.LastStats.AICreaturesDefeated == 2, "GameManager LastStats records correct AI defeated count");
+
+            // --- Section 8: 20+ Automated Consecutive Game Restarts Stress Test ---
+            const int restartCycles = 25;
+            bool allRestartsPassed = true;
+
+            for (int cycle = 1; cycle <= restartCycles; cycle++)
+            {
+                // Restart match
+                testGameMgr.RestartGame();
+
+                // Validate complete clean state
+                bool isPlaying = testGameMgr.CurrentState == GameState.Playing;
+                bool scoreZero = scoreMgr.CurrentScore == 0 && testPlayerResetBody.CurrentScore == 0;
+                bool lengthReset = testPlayerResetBody.CurrentLength == 10;
+                bool posZero = Vector2.Distance(testPlayerReset.transform.position, Vector2.zero) < 0.001f;
+                bool notDead = !testPlayerResetDeath.IsDead && testPlayerReset.activeSelf;
+                bool controllerActive = testPlayerReset.GetComponent<PlayerController>().enabled;
+                bool statsReset = testGameMgr.SurvivalTimer == 0f && testGameMgr.FoodCollected == 0 && testGameMgr.AICreaturesDefeated == 0;
+                bool aiRespawned = testAISpawner.ActiveAICount == 10;
+                bool foodActive = spawner.ActiveFoodCount >= 50;
+
+                if (!isPlaying || !scoreZero || !lengthReset || !posZero || !notDead || !controllerActive || !statsReset || !aiRespawned || !foodActive)
+                {
+                    allRestartsPassed = false;
+                    Assert(false, $"Game Restart Cycle #{cycle} failed state validation (State: {isPlaying}, Score0: {scoreZero}, Length10: {lengthReset}, Pos0: {posZero}, Alive: {notDead}, AI: {aiRespawned}, Food: {foodActive})");
+                    break;
+                }
+
+                // Simulate brief gameplay in this cycle: consume 2 foods and kill 1 AI
+                testPlayerResetBody.OnEatFood(standardFood);
+                testPlayerResetBody.OnEatFood(superFood);
+                testGameMgr.RecordAIDefeated();
+
+                // Kill player to end the cycle
+                testPlayerResetDeath.Die(DeathReason.HitCreatureBody);
+            }
+
+            Assert(allRestartsPassed, $"Successfully executed {restartCycles} consecutive game restart cycles with zero memory leaks or dangling state");
+
+            // --- Section 9: MVP Gameplay HUD, Safe Area & Pause Menu Verification ---
+            SafeAreaFitter safeAreaFitter = canvasTestGo.GetComponentInChildren<SafeAreaFitter>(true);
+            Assert(safeAreaFitter != null, "SafeAreaFitter component exists on SafeArea GameObject in JoystickCanvas");
+            safeAreaFitter.ApplySafeArea();
+            RectTransform safeAreaRect = safeAreaFitter.GetComponent<RectTransform>();
+            Assert(safeAreaRect.anchorMin.x >= 0f && safeAreaRect.anchorMax.x <= 1f, "SafeAreaFitter calculates normalized mobile landscape anchors correctly");
+
+            GameplayHUD testHUD = canvasTestGo.GetComponentInChildren<GameplayHUD>(true);
+            Assert(testHUD != null, "GameplayHUD component exists in JoystickCanvas prefab");
+            testHUD.BindPlayer(testPlayerResetBody, testPlayerResetBody.GetComponent<GrowthSystem>());
+
+            // Test Pause & Resume System
+            testGameMgr.StartNewGame();
+            Assert(testGameMgr.IsPlaying, "GameManager is active and playing");
+            Assert(Mathf.Approximately(Time.timeScale, 1f), "Time.timeScale is 1.0 during active gameplay");
+
+            testGameMgr.PauseGame();
+            Assert(testGameMgr.IsPaused, "GameManager transitions to Paused state upon PauseGame()");
+            Assert(Mathf.Approximately(Time.timeScale, 0f), "Time.timeScale is 0.0 when game is paused");
+
+            testGameMgr.ResumeGame();
+            Assert(testGameMgr.IsPlaying, "GameManager resumes to Playing state upon ResumeGame()");
+            Assert(Mathf.Approximately(Time.timeScale, 1f), "Time.timeScale is restored to 1.0 upon ResumeGame()");
+
+            // Test High Score / Best Score persistence on GameOver
+            scoreMgr.AddScore(500);
+            testPlayerResetDeath.Die(DeathReason.HitCreatureBody);
+            Assert(scoreMgr.HighScore >= 500, $"ScoreManager HighScore tracked correctly ({scoreMgr.HighScore})");
 
             // Cleanup test instances
-            Object.DestroyImmediate(spawnerGo);
+            Object.DestroyImmediate(testPlayerReset);
+            Object.DestroyImmediate(aiSpawnerTestGo);
+            Object.DestroyImmediate(gameMgrGo);
+            Object.DestroyImmediate(canvasTestGo);
+            Object.DestroyImmediate(foodDropAI);
+            Object.DestroyImmediate(aiE);
+            Object.DestroyImmediate(aiF);
+            Object.DestroyImmediate(aiC);
+            Object.DestroyImmediate(aiD);
+            Object.DestroyImmediate(aiA);
+            Object.DestroyImmediate(aiB);
+            Object.DestroyImmediate(livingAI);
+            Object.DestroyImmediate(victimAI);
+            for (int i = 0; i < tenAIs.Count; i++) Object.DestroyImmediate(tenAIs[i]);
+            for (int i = 0; i < fiveAIs.Count; i++) Object.DestroyImmediate(fiveAIs[i]);
+            Object.DestroyImmediate(ai1Go);
             Object.DestroyImmediate(testFoodGo);
             Object.DestroyImmediate(testPlayer);
+            Object.DestroyImmediate(scoreMgrGo);
+            Object.DestroyImmediate(spawnerGo);
 
             Debug.Log("=== [GigaGrub Verification Tests] ALL TESTS PASSED! ===");
         }

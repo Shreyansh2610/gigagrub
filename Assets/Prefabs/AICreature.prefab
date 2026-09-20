@@ -1,0 +1,304 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1 &2977776604915646198
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 4611604622215372046}
+  - component: {fileID: 5175173203177045529}
+  - component: {fileID: 2949513453319075045}
+  - component: {fileID: 399704244557292154}
+  - component: {fileID: 6236207570449401110}
+  - component: {fileID: 8292239746842269303}
+  - component: {fileID: 1964457367884563546}
+  - component: {fileID: 682057841988486025}
+  - component: {fileID: 6450167078109892086}
+  - component: {fileID: 5246796691836484946}
+  - component: {fileID: 2637768465374679657}
+  m_Layer: 0
+  m_Name: AICreature
+  m_TagString: AICreature
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &4611604622215372046
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &5175173203177045529
+SpriteRenderer:
+  serializedVersion: 3
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 10754, guid: 0000000000000000f000000000000000, type: 0}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 98
+  m_MaskInteraction: 0
+  m_Sprite: {fileID: -1554359448631966412, guid: 7086f7f9acebfb34bab5070edbc2e1e5, type: 3}
+  m_Color: {r: 1, g: 0.4, b: 0.4, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 1.28, y: 1.28}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_SpriteSortPoint: 0
+  m_BlendShapeWeights: []
+--- !u!58 &2949513453319075045
+CircleCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_CompositeOperation: 0
+  m_CompositeOrder: 0
+  m_Offset: {x: 0, y: 0}
+  m_Radius: 0.55
+--- !u!50 &399704244557292154
+Rigidbody2D:
+  serializedVersion: 5
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_BodyType: 1
+  m_Simulated: 1
+  m_UseFullKinematicContacts: 0
+  m_UseAutoMass: 0
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_GravityScale: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_Interpolate: 0
+  m_SleepingMode: 1
+  m_CollisionDetection: 0
+  m_Constraints: 0
+--- !u!114 &6236207570449401110
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d0b12f82c1560c43b1c288b20ed58f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.AI.AIWorldDetector
+  foodVisionRadius: 12
+  creatureDangerRadius: 3.5
+  boundaryDangerDistance: 6
+  creatureLayerMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+--- !u!114 &8292239746842269303
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2c42ed35d219f4949a163e67603432bc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.AI.AIStateMachine
+  detector: {fileID: 6236207570449401110}
+  wanderFrequency: 1.5
+  wanderAngleJitter: 45
+--- !u!114 &1964457367884563546
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fbf7839ff6d66b04eb00d67f50e6a13f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.AI.AIController
+  moveSpeed: 4.8
+  turnSpeed: 280
+  headRadius: 0.5
+  decisionInterval: 0.15
+  stateMachine: {fileID: 8292239746842269303}
+  worldDetector: {fileID: 6236207570449401110}
+  creatureBody: {fileID: 2637768465374679657}
+--- !u!114 &682057841988486025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d50603f016d2b544fbccab9285ca6844, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Systems.GrowthSystem
+  playerBody: {fileID: 2637768465374679657}
+  growthRate: 30
+  minIntervalBetweenSegments: 0.02
+--- !u!114 &6450167078109892086
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f226aabd17b7e964ab1d137cb33b4a36, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.CreatureDeath
+  dropFoodOnDeath: 1
+  foodDropRatio: 0.75
+  overrideDropFood: {fileID: 0}
+  creatureBody: {fileID: 2637768465374679657}
+  playerController: {fileID: 0}
+  aiController: {fileID: 1964457367884563546}
+  headCollider: {fileID: 2949513453319075045}
+  audioSource: {fileID: 0}
+--- !u!114 &5246796691836484946
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b17b8c347aa3af241b020f0f445ea4ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.CreatureCollision
+  headToHeadRule: 0
+  ownerBody: {fileID: 2637768465374679657}
+  creatureDeath: {fileID: 6450167078109892086}
+  headCollider: {fileID: 2949513453319075045}
+--- !u!114 &2637768465374679657
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 85bc060f633619b4ea583e18cd3edaf2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.PlayerBody
+  isPlayer: 0
+  startingLength: 10
+  maxLength: 600
+  segmentSpacing: 0.45
+  stepDistance: 0.05
+  growthMultiplier: 1
+  smoothGrowthSpeed: 8
+  enableTaper: 1
+  minTailScale: 0.65
+  headSortingOrder: 98
+  headTintColor: {r: 1, g: 1, b: 1, a: 1}
+  bodyTintColor: {r: 1, g: 1, b: 1, a: 1}
+  enableAudioFeedback: 0
+  enableVisualPunch: 1
+  headPunchScale: 1.15
+  segmentPrefab: {fileID: 7279581167953519022, guid: 643ca1d40473f36429be516632f5fb55, type: 3}
+  headTransform: {fileID: 4611604622215372046}
+  segmentsParent: {fileID: 0}
+  audioSource: {fileID: 0}
+  growthSystem: {fileID: 682057841988486025}
+  creatureCollision: {fileID: 5246796691836484946}
+  creatureDeath: {fileID: 6450167078109892086}
+  headSpriteRenderer: {fileID: 0}

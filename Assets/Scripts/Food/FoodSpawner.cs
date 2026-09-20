@@ -61,14 +61,22 @@ namespace GigaGrub.Food
         public int TotalPoolCount => pool.Count + activeFoods.Count;
         public IReadOnlyList<Food> ActiveFoods => activeFoods;
 
+        public static void SetInstanceForTest(FoodSpawner spawner)
+        {
+            Instance = spawner;
+        }
+
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            InitializeRuntime();
+        }
+
+        public void InitializeRuntime()
+        {
+            if (Instance == null)
             {
-                Destroy(gameObject);
-                return;
+                Instance = this;
             }
-            Instance = this;
 
             if (foodParent == null)
             {
@@ -179,6 +187,15 @@ namespace GigaGrub.Food
             FoodData chosenData = SelectRandomFoodData();
             if (chosenData == null) return null;
 
+            Vector2 spawnPos = GetSafeSpawnPosition();
+            return SpawnFoodAt(spawnPos, chosenData);
+        }
+
+        public Food SpawnFoodAt(Vector2 position, FoodData overrideData = null)
+        {
+            FoodData chosenData = overrideData != null ? overrideData : SelectRandomFoodData();
+            if (chosenData == null) return null;
+
             if (pool.Count == 0)
             {
                 CreatePooledFood();
@@ -186,9 +203,7 @@ namespace GigaGrub.Food
 
             Food food = pool.Dequeue();
             food.Initialize(chosenData, defaultFoodSprite);
-
-            Vector2 spawnPos = GetSafeSpawnPosition();
-            food.OnSpawn(spawnPos);
+            food.OnSpawn(position);
 
             activeFoods.Add(food);
             return food;

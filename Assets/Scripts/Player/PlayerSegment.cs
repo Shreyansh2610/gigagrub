@@ -7,10 +7,13 @@ namespace GigaGrub.Player
         [Header("Visuals")]
         [SerializeField] private SpriteRenderer spriteRenderer;
 
+        private PlayerBody owner;
         private Vector3 targetScale = Vector3.one;
         private Vector3 currentScale = Vector3.one;
         private float scaleSpeed = 8f;
         private bool isScaling = false;
+
+        public PlayerBody Owner => owner;
 
         private void Awake()
         {
@@ -36,6 +39,11 @@ namespace GigaGrub.Player
             }
         }
 
+        public void SetOwner(PlayerBody newOwner)
+        {
+            owner = newOwner;
+        }
+
         public void SetSortingOrder(int order)
         {
             if (spriteRenderer == null)
@@ -46,6 +54,19 @@ namespace GigaGrub.Player
             if (spriteRenderer != null)
             {
                 spriteRenderer.sortingOrder = order;
+            }
+        }
+
+        public void SetColor(Color color)
+        {
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = color;
             }
         }
 
@@ -66,8 +87,9 @@ namespace GigaGrub.Player
             }
         }
 
-        public void OnSpawnFromPool(Vector3 position, Quaternion rotation, int sortingOrder, float scaleMultiplier = 1f, bool smoothScaleIn = true, float growthSpeed = 8f)
+        public void OnSpawnFromPool(PlayerBody bodyOwner, Vector3 position, Quaternion rotation, int sortingOrder, float scaleMultiplier = 1f, bool smoothScaleIn = true, float growthSpeed = 8f)
         {
+            owner = bodyOwner;
             transform.position = position;
             transform.rotation = rotation;
             SetSortingOrder(sortingOrder);

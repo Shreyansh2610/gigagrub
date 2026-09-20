@@ -83,6 +83,12 @@ namespace GigaGrub.Core
 
             // Smooth position interpolation
             transform.position = Vector3.Lerp(transform.position, desiredPosition, smoothSpeed * Time.deltaTime);
+
+            // Ensure interpolated camera position stays strictly within arena bounds on every frame
+            if (clampToArena && ArenaManager.Instance != null)
+            {
+                transform.position = ClampCameraPosition(transform.position);
+            }
         }
 
         public Vector3 ClampCameraPosition(Vector3 rawPosition)
@@ -137,6 +143,19 @@ namespace GigaGrub.Core
         public void ResetZoom()
         {
             SetZoom(defaultZoom);
+        }
+
+        public void SnapToTarget()
+        {
+            if (target == null) return;
+
+            Vector3 desiredPosition = target.position + offset;
+            if (clampToArena && ArenaManager.Instance != null)
+            {
+                desiredPosition = ClampCameraPosition(desiredPosition);
+            }
+            transform.position = desiredPosition;
+            ResetZoom();
         }
     }
 }

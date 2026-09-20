@@ -1,0 +1,44 @@
+VBCSCompilerPreWarmer: pre-warm launched (dotnet PID 32576)
+VBCSCompiler prewarm took 8.71 ms
+[Licensing::Module] Trying to connect to existing licensing client channel...
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-shrey" at "2026-09-20T06:17:22.9478644Z"
+Built from '6000.6/respin/6000.6.0f1-fa21a270ab12' branch; Version is '6000.6.0f1 (f7f8ed4d1e24) revision 16251117'; Using compiler version '194234433'; Build Type 'Release'
+OS: 'Windows 11  (10.0.26200) CoreSingleLanguage' Language: 'en' Physical Memory: 24244 MB
+BatchMode: 1, IsHumanControllingUs: 0, StartBugReporterOnCrash: 0, Is64bit: 1
+System  architecture: x64
+Process architecture: x64
+Date: 2026-09-20T06:17:22Z
+[Licensing::Client] Code 10 while verifying Licensing Client signature (process Id: 20044, path: "C:/Program Files/Unity Hub/UnityLicensingClient_V1/Unity.Licensing.Client.exe")
+[Licensing::Module] LicensingClient has failed validation; ignoring
+[Licensing::Client] Handshaking with LicensingClient:
+  Version:                 1.18.3+d7ffd15
+  Session Id:              4ef2a4e82fdc4595b0cc9c45e9613cc1
+  Correlation Id:          058b60e7a20139ebb1fb88dc82239aa4
+  External correlation Id: 1883198724338886542
+  Machine Id:              8RT//n7W2GJSJd27UnznzshS8xo=
+[Licensing::Module] Successfully connected to LicensingClient on channel: "LicenseClient-shrey" (connect: 0.00s, validation: 0.00s, handshake: 0.05s)
+[Licensing::IpcConnector] Successfully connected to: "LicenseClient-shrey-notifications" at "2026-09-20T06:17:23.0041396Z"
+[Licensing::Module] Error: Access token is unavailable; failed to update
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] License group:
+  Id: 13469303599736-UnityPersXXXX
+  Product: Unity Personal
+  Type: Assigned
+  Expiration: Unlimited
+[Licensing::Client] Successfully updated license, isAsync: True, time: 0.01
+[Licensing::Client] Successfully resolved entitlement details
+[Licensing::Module] Licensing Background thread has ended after 0.10s
+
+COMMAND LINE ARGUMENTS:
+C:\Program Files\Unity\Hub\Editor\6000.6.0f1\Editor\Unity.exe
+-quit
+-batchmode
+-projectPath
+d:\Project\Games\GigaGrub
+-executeMethod
+GigaGrub.Editor.PlayerSetupEditor.RunVerificationTests
+-logFile
+d:\Project\Games\GigaGrub\UnityTest.log
+Successfully changed project path to: d:\Project\Games\GigaGrub
+D:/Project/Games/GigaGrub
+[ExitDontLaunchBugReporter] Exiting without the bug reporter. Application will exit with return code 1
