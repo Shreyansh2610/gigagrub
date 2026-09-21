@@ -14,6 +14,7 @@ using GigaGrub.AI;
 
 namespace GigaGrub.Editor
 {
+    [InitializeOnLoad]
     public static class PlayerSetupEditor
     {
         private const string PrefabsPath = "Assets/Prefabs";
@@ -21,9 +22,31 @@ namespace GigaGrub.Editor
         private const string ScenesPath = "Assets/Scenes";
         private const string FoodResourcesPath = "Assets/Resources/Food";
 
+        static PlayerSetupEditor()
+        {
+            EditorApplication.delayCall += EnsureBuildScenesRegistered;
+        }
+
+        public static void EnsureBuildScenesRegistered()
+        {
+            var scenes = new EditorBuildSettingsScene[]
+            {
+                new EditorBuildSettingsScene($"{ScenesPath}/MainMenu.unity", true),
+                new EditorBuildSettingsScene($"{ScenesPath}/Game.unity", true)
+            };
+            EditorBuildSettings.scenes = scenes;
+        }
+
         [MenuItem("GigaGrub/1. Setup All (Prefabs, Food & Game Scene)")]
         public static void SetupAll()
         {
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogError("[GigaGrub] Cannot run Scene Setup while Unity is in Play Mode! Please click the Play button to stop Play Mode first.");
+                EditorUtility.DisplayDialog("GigaGrub Setup", "Cannot run Scene Setup while in Play Mode.\nPlease exit Play Mode in Unity first and try again.", "OK");
+                return;
+            }
+
             Debug.Log("[GigaGrub] Starting Full Setup...");
 
             EnsureDirectories();
@@ -37,11 +60,19 @@ namespace GigaGrub.Editor
             GameObject foodPrefab = SetupFoodPrefab();
 
             SetupGameScene(playerPrefab, joystickCanvasPrefab, arenaPrefab, foodPrefab, foodDataAssets, eatingEffectPrefab, aiCreaturePrefab);
+            SetupMainMenuScene();
+
+            // Register scenes in Build Settings (MainMenu = Index 0, Game = Index 1)
+            EditorBuildSettings.scenes = new EditorBuildSettingsScene[]
+            {
+                new EditorBuildSettingsScene($"{ScenesPath}/MainMenu.unity", true),
+                new EditorBuildSettingsScene($"{ScenesPath}/Game.unity", true)
+            };
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[GigaGrub] Full Setup Completed Successfully!");
+            Debug.Log("[GigaGrub] Full Setup (MainMenu + Game Scenes) Completed Successfully!");
         }
 
         private static void EnsureDirectories()
@@ -1165,7 +1196,10 @@ namespace GigaGrub.Editor
             soAiSpawner.FindProperty("minSpawnDistance").floatValue = 12f;
             soAiSpawner.ApplyModifiedPropertiesWithoutUndo();
 
-            // 7. GameManager
+            // 7. SaveManager & GameManager
+            GameObject saveManagerGo = new GameObject("SaveManager");
+            SaveManager saveManager = saveManagerGo.AddComponent<SaveManager>();
+
             GameObject gameManagerGo = new GameObject("GameManager");
             GameManager gameManager = gameManagerGo.AddComponent<GameManager>();
             GameOverUI gameOverUI = canvasInstance.GetComponentInChildren<GameOverUI>(true);
@@ -1183,6 +1217,7 @@ namespace GigaGrub.Editor
             soGameMgr.FindProperty("foodSpawner").objectReferenceValue = spawner;
             soGameMgr.FindProperty("scoreManager").objectReferenceValue = scoreMgr;
             soGameMgr.FindProperty("rankingManager").objectReferenceValue = rankingMgr;
+            soGameMgr.FindProperty("saveManager").objectReferenceValue = saveManager;
             soGameMgr.FindProperty("cameraFollow").objectReferenceValue = camFollow;
             soGameMgr.FindProperty("gameOverUI").objectReferenceValue = gameOverUI;
             soGameMgr.FindProperty("gameplayHUD").objectReferenceValue = gameplayHUD;
@@ -1199,6 +1234,630 @@ namespace GigaGrub.Editor
 
             EditorSceneManager.SaveScene(scene, scenePath);
             Debug.Log($"[GigaGrub] Saved Game scene with GameManager, 10 AI Creatures and Collision System to {scenePath}");
+        }
+
+        [MenuItem("GigaGrub/8.5. Setup MainMenu Scene")]
+        public static void MenuSetupMainMenuScene()
+        {
+            SetupMainMenuScene();
+        }
+
+        public static void SetupMainMenuScene()
+        {
+            if (EditorApplication.isPlaying)
+            {
+                Debug.LogError("[GigaGrub] Cannot run SetupMainMenuScene while Unity is in Play Mode! Please click the Play button to stop Play Mode first.");
+                EditorUtility.DisplayDialog("GigaGrub Setup", "Cannot run Scene Setup while in Play Mode.\nPlease exit Play Mode in Unity first and try again.", "OK");
+                return;
+            }
+
+            EnsureDirectories();
+            string scenePath = $"{ScenesPath}/MainMenu.unity";
+
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // 1. Camera
+            GameObject camGo = new GameObject("Main Camera");
+            camGo.tag = "MainCamera";
+            camGo.transform.position = new Vector3(0, 0, -10);
+
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.orthographic = true;
+            cam.orthographicSize = 9f;
+            cam.backgroundColor = new Color(0.04f, 0.06f, 0.10f, 1f); // Sleek Dark Slate
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            camGo.AddComponent<AudioListener>();
+
+            // 2. SaveManager & SceneTransitionManager
+            GameObject saveMgrGo = new GameObject("SaveManager");
+            saveMgrGo.AddComponent<SaveManager>();
+
+            GameObject transMgrGo = new GameObject("SceneTransitionManager");
+            transMgrGo.AddComponent<SceneTransitionManager>();
+
+            // 3. Main Menu Canvas (1920x1080 Landscape Scaler)
+            GameObject canvasGo = new GameObject("MainMenuCanvas");
+            Canvas canvas = canvasGo.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+            CanvasScaler scaler = canvasGo.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = 0.5f;
+
+            canvasGo.AddComponent<GraphicRaycaster>();
+            MainMenuUI menuUI = canvasGo.AddComponent<MainMenuUI>();
+
+            // Safe Area Container
+            GameObject safeAreaGo = new GameObject("SafeArea");
+            safeAreaGo.transform.SetParent(canvasGo.transform, false);
+            RectTransform safeAreaRect = safeAreaGo.AddComponent<RectTransform>();
+            safeAreaRect.anchorMin = Vector2.zero;
+            safeAreaRect.anchorMax = Vector2.one;
+            safeAreaRect.offsetMin = Vector2.zero;
+            safeAreaRect.offsetMax = Vector2.zero;
+            safeAreaGo.AddComponent<SafeAreaFitter>();
+
+            // Background Subtle Glow / Grid Overlay
+            GameObject bgGo = new GameObject("BackgroundVisual");
+            bgGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform bgRect = bgGo.AddComponent<RectTransform>();
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+            Image bgImg = bgGo.AddComponent<Image>();
+            bgImg.color = new Color(0.03f, 0.05f, 0.08f, 0.85f);
+
+            // ==========================================
+            // LOGO BANNER (Original stylized placeholder)
+            // ==========================================
+            GameObject logoGo = new GameObject("LogoBanner");
+            logoGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform logoRect = logoGo.AddComponent<RectTransform>();
+            logoRect.anchorMin = new Vector2(0.5f, 0.76f);
+            logoRect.anchorMax = new Vector2(0.5f, 0.76f);
+            logoRect.pivot = new Vector2(0.5f, 0.5f);
+            logoRect.anchoredPosition = Vector2.zero;
+            logoRect.sizeDelta = new Vector2(850f, 180f);
+
+            GameObject titleTxtGo = new GameObject("TitleText");
+            titleTxtGo.transform.SetParent(logoGo.transform, false);
+            RectTransform titleRect = titleTxtGo.AddComponent<RectTransform>();
+            titleRect.anchorMin = new Vector2(0f, 0.35f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.offsetMin = Vector2.zero;
+            titleRect.offsetMax = Vector2.zero;
+
+            Text titleTxt = titleTxtGo.AddComponent<Text>();
+            titleTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            titleTxt.fontSize = 86;
+            titleTxt.fontStyle = FontStyle.Bold;
+            titleTxt.alignment = TextAnchor.MiddleCenter;
+            titleTxt.color = new Color(0.29f, 0.87f, 0.50f, 1f); // Neon Emerald #4ADE80
+            titleTxt.text = "GIGA GRUB";
+
+            Shadow titleShadow = titleTxtGo.AddComponent<Shadow>();
+            titleShadow.effectColor = new Color(0.02f, 0.25f, 0.12f, 0.85f);
+            titleShadow.effectDistance = new Vector2(3f, -3f);
+
+            GameObject subTxtGo = new GameObject("SubtitleText");
+            subTxtGo.transform.SetParent(logoGo.transform, false);
+            RectTransform subRect = subTxtGo.AddComponent<RectTransform>();
+            subRect.anchorMin = new Vector2(0f, 0f);
+            subRect.anchorMax = new Vector2(1f, 0.35f);
+            subRect.offsetMin = Vector2.zero;
+            subRect.offsetMax = Vector2.zero;
+
+            Text subTxt = subTxtGo.AddComponent<Text>();
+            subTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            subTxt.fontSize = 24;
+            subTxt.fontStyle = FontStyle.Bold;
+            subTxt.alignment = TextAnchor.MiddleCenter;
+            subTxt.color = new Color(0.22f, 0.74f, 0.97f, 1f); // Sky Cyan #38BDF8
+            subTxt.text = "NEON SLITHER ARENA";
+
+            // ==========================================
+            // BEST SCORE BADGE
+            // ==========================================
+            GameObject bestBadgeGo = new GameObject("BestScoreBadge");
+            bestBadgeGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform bestRect = bestBadgeGo.AddComponent<RectTransform>();
+            bestRect.anchorMin = new Vector2(0.5f, 0.58f);
+            bestRect.anchorMax = new Vector2(0.5f, 0.58f);
+            bestRect.pivot = new Vector2(0.5f, 0.5f);
+            bestRect.anchoredPosition = Vector2.zero;
+            bestRect.sizeDelta = new Vector2(380f, 54f);
+
+            Image bestImg = bestBadgeGo.AddComponent<Image>();
+            bestImg.color = new Color(0.06f, 0.09f, 0.15f, 0.85f);
+
+            GameObject bestTxtGo = new GameObject("Text");
+            bestTxtGo.transform.SetParent(bestBadgeGo.transform, false);
+            RectTransform bestTxtRect = bestTxtGo.AddComponent<RectTransform>();
+            bestTxtRect.anchorMin = Vector2.zero;
+            bestTxtRect.anchorMax = Vector2.one;
+            bestTxtRect.offsetMin = Vector2.zero;
+            bestTxtRect.offsetMax = Vector2.zero;
+
+            Text bestTxt = bestTxtGo.AddComponent<Text>();
+            bestTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            bestTxt.fontSize = 24;
+            bestTxt.fontStyle = FontStyle.Bold;
+            bestTxt.alignment = TextAnchor.MiddleCenter;
+            bestTxt.color = new Color(0.99f, 0.83f, 0.30f, 1f); // Amber Gold #FCD34D
+            bestTxt.text = "BEST SCORE: 0";
+
+            // ==========================================
+            // PLAY BUTTON
+            // ==========================================
+            GameObject playBtnGo = new GameObject("PlayButton");
+            playBtnGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform playRect = playBtnGo.AddComponent<RectTransform>();
+            playRect.anchorMin = new Vector2(0.5f, 0.43f);
+            playRect.anchorMax = new Vector2(0.5f, 0.43f);
+            playRect.pivot = new Vector2(0.5f, 0.5f);
+            playRect.anchoredPosition = Vector2.zero;
+            playRect.sizeDelta = new Vector2(400f, 96f);
+
+            Image playImg = playBtnGo.AddComponent<Image>();
+            playImg.color = new Color(0.06f, 0.73f, 0.51f, 1f); // Vibrant Emerald #10B981
+
+            Button playBtn = playBtnGo.AddComponent<Button>();
+
+            GameObject playTxtGo = new GameObject("Text");
+            playTxtGo.transform.SetParent(playBtnGo.transform, false);
+            RectTransform playTxtRect = playTxtGo.AddComponent<RectTransform>();
+            playTxtRect.anchorMin = Vector2.zero;
+            playTxtRect.anchorMax = Vector2.one;
+            playTxtRect.offsetMin = Vector2.zero;
+            playTxtRect.offsetMax = Vector2.zero;
+
+            Text playTxt = playTxtGo.AddComponent<Text>();
+            playTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            playTxt.fontSize = 46;
+            playTxt.fontStyle = FontStyle.Bold;
+            playTxt.alignment = TextAnchor.MiddleCenter;
+            playTxt.color = Color.white;
+            playTxt.text = "PLAY";
+
+            // ==========================================
+            // NAVIGATION BUTTONS (STATISTICS & SETTINGS)
+            // ==========================================
+            GameObject statsBtnGo = new GameObject("StatsButton");
+            statsBtnGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform statsBtnRect = statsBtnGo.AddComponent<RectTransform>();
+            statsBtnRect.anchorMin = new Vector2(0.5f, 0.26f);
+            statsBtnRect.anchorMax = new Vector2(0.5f, 0.26f);
+            statsBtnRect.pivot = new Vector2(0.5f, 0.5f);
+            statsBtnRect.anchoredPosition = new Vector2(-155f, 0f);
+            statsBtnRect.sizeDelta = new Vector2(270f, 70f);
+
+            Image statsBtnImg = statsBtnGo.AddComponent<Image>();
+            statsBtnImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f); // Slate #1E293B
+            Button statsBtn = statsBtnGo.AddComponent<Button>();
+
+            GameObject statsTxtGo = new GameObject("Text");
+            statsTxtGo.transform.SetParent(statsBtnGo.transform, false);
+            RectTransform statsTxtRect = statsTxtGo.AddComponent<RectTransform>();
+            statsTxtRect.anchorMin = Vector2.zero;
+            statsTxtRect.anchorMax = Vector2.one;
+            statsTxtRect.offsetMin = Vector2.zero;
+            statsTxtRect.offsetMax = Vector2.zero;
+
+            Text statsTxt = statsTxtGo.AddComponent<Text>();
+            statsTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            statsTxt.fontSize = 24;
+            statsTxt.fontStyle = FontStyle.Bold;
+            statsTxt.alignment = TextAnchor.MiddleCenter;
+            statsTxt.color = new Color(0.89f, 0.91f, 0.94f, 1f);
+            statsTxt.text = "STATISTICS";
+
+            GameObject settBtnGo = new GameObject("SettingsButton");
+            settBtnGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform settBtnRect = settBtnGo.AddComponent<RectTransform>();
+            settBtnRect.anchorMin = new Vector2(0.5f, 0.26f);
+            settBtnRect.anchorMax = new Vector2(0.5f, 0.26f);
+            settBtnRect.pivot = new Vector2(0.5f, 0.5f);
+            settBtnRect.anchoredPosition = new Vector2(155f, 0f);
+            settBtnRect.sizeDelta = new Vector2(270f, 70f);
+
+            Image settBtnImg = settBtnGo.AddComponent<Image>();
+            settBtnImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
+            Button settBtn = settBtnGo.AddComponent<Button>();
+
+            GameObject settTxtGo = new GameObject("Text");
+            settTxtGo.transform.SetParent(settBtnGo.transform, false);
+            RectTransform settTxtRect = settTxtGo.AddComponent<RectTransform>();
+            settTxtRect.anchorMin = Vector2.zero;
+            settTxtRect.anchorMax = Vector2.one;
+            settTxtRect.offsetMin = Vector2.zero;
+            settTxtRect.offsetMax = Vector2.zero;
+
+            Text settTxt = settTxtGo.AddComponent<Text>();
+            settTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            settTxt.fontSize = 24;
+            settTxt.fontStyle = FontStyle.Bold;
+            settTxt.alignment = TextAnchor.MiddleCenter;
+            settTxt.color = new Color(0.89f, 0.91f, 0.94f, 1f);
+            settTxt.text = "SETTINGS";
+
+            // ==========================================
+            // STATISTICS MODAL DIALOG
+            // ==========================================
+            GameObject statsModalGo = new GameObject("StatisticsModal");
+            statsModalGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform statsModalRect = statsModalGo.AddComponent<RectTransform>();
+            statsModalRect.anchorMin = Vector2.zero;
+            statsModalRect.anchorMax = Vector2.one;
+            statsModalRect.offsetMin = Vector2.zero;
+            statsModalRect.offsetMax = Vector2.zero;
+
+            Image statsModalDim = statsModalGo.AddComponent<Image>();
+            statsModalDim.color = new Color(0f, 0f, 0f, 0.72f);
+            CanvasGroup statsCg = statsModalGo.AddComponent<CanvasGroup>();
+
+            GameObject statsDialogGo = new GameObject("DialogBox");
+            statsDialogGo.transform.SetParent(statsModalGo.transform, false);
+            RectTransform statsDialogRect = statsDialogGo.AddComponent<RectTransform>();
+            statsDialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            statsDialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            statsDialogRect.pivot = new Vector2(0.5f, 0.5f);
+            statsDialogRect.sizeDelta = new Vector2(860f, 560f);
+
+            Image statsDialogBg = statsDialogGo.AddComponent<Image>();
+            statsDialogBg.color = new Color(0.07f, 0.10f, 0.17f, 0.98f); // Deep Slate #0F172A
+
+            GameObject statsHeaderGo = new GameObject("Header");
+            statsHeaderGo.transform.SetParent(statsDialogGo.transform, false);
+            RectTransform statsHeaderRect = statsHeaderGo.AddComponent<RectTransform>();
+            statsHeaderRect.anchorMin = new Vector2(0f, 0.85f);
+            statsHeaderRect.anchorMax = new Vector2(1f, 1f);
+            statsHeaderRect.offsetMin = Vector2.zero;
+            statsHeaderRect.offsetMax = Vector2.zero;
+
+            Text statsHeaderTxt = statsHeaderGo.AddComponent<Text>();
+            statsHeaderTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            statsHeaderTxt.fontSize = 32;
+            statsHeaderTxt.fontStyle = FontStyle.Bold;
+            statsHeaderTxt.alignment = TextAnchor.MiddleCenter;
+            statsHeaderTxt.color = new Color(0.22f, 0.74f, 0.97f, 1f); // Sky Cyan #38BDF8
+            statsHeaderTxt.text = "CAREER STATISTICS";
+
+            Text statScoreVal = CreateStatsRow(statsDialogGo, "Best Score", new Vector2(0f, 0.68f), new Color(0.99f, 0.83f, 0.30f, 1f));
+            Text statLengthVal = CreateStatsRow(statsDialogGo, "Best Length", new Vector2(0f, 0.54f), new Color(0.29f, 0.87f, 0.50f, 1f));
+            Text statGamesVal = CreateStatsRow(statsDialogGo, "Games Played", new Vector2(0f, 0.40f), new Color(0.89f, 0.91f, 0.94f, 1f));
+            Text statFoodVal = CreateStatsRow(statsDialogGo, "Food Collected", new Vector2(0f, 0.26f), new Color(0.96f, 0.45f, 0.71f, 1f));
+            Text statAIVal = CreateStatsRow(statsDialogGo, "AI Defeated", new Vector2(0f, 0.12f), new Color(0.97f, 0.44f, 0.44f, 1f));
+
+            // Close Stats Button
+            GameObject statsCloseBtnGo = new GameObject("CloseButton");
+            statsCloseBtnGo.transform.SetParent(statsDialogGo.transform, false);
+            RectTransform statsCloseRect = statsCloseBtnGo.AddComponent<RectTransform>();
+            statsCloseRect.anchorMin = new Vector2(0.5f, 0.02f);
+            statsCloseRect.anchorMax = new Vector2(0.5f, 0.02f);
+            statsCloseRect.pivot = new Vector2(0.5f, 0f);
+            statsCloseRect.sizeDelta = new Vector2(260f, 54f);
+
+            Image statsCloseImg = statsCloseBtnGo.AddComponent<Image>();
+            statsCloseImg.color = new Color(0.20f, 0.25f, 0.33f, 1f);
+            Button statsCloseBtn = statsCloseBtnGo.AddComponent<Button>();
+
+            GameObject statsCloseTxtGo = new GameObject("Text");
+            statsCloseTxtGo.transform.SetParent(statsCloseBtnGo.transform, false);
+            RectTransform statsCloseTxtRect = statsCloseTxtGo.AddComponent<RectTransform>();
+            statsCloseTxtRect.anchorMin = Vector2.zero;
+            statsCloseTxtRect.anchorMax = Vector2.one;
+            statsCloseTxtRect.offsetMin = Vector2.zero;
+            statsCloseTxtRect.offsetMax = Vector2.zero;
+
+            Text statsCloseTxt = statsCloseTxtGo.AddComponent<Text>();
+            statsCloseTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            statsCloseTxt.fontSize = 22;
+            statsCloseTxt.fontStyle = FontStyle.Bold;
+            statsCloseTxt.alignment = TextAnchor.MiddleCenter;
+            statsCloseTxt.color = Color.white;
+            statsCloseTxt.text = "CLOSE";
+
+            // ==========================================
+            // SETTINGS MODAL DIALOG
+            // ==========================================
+            GameObject settModalGo = new GameObject("SettingsModal");
+            settModalGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform settModalRect = settModalGo.AddComponent<RectTransform>();
+            settModalRect.anchorMin = Vector2.zero;
+            settModalRect.anchorMax = Vector2.one;
+            settModalRect.offsetMin = Vector2.zero;
+            settModalRect.offsetMax = Vector2.zero;
+
+            Image settModalDim = settModalGo.AddComponent<Image>();
+            settModalDim.color = new Color(0f, 0f, 0f, 0.72f);
+            CanvasGroup settCg = settModalGo.AddComponent<CanvasGroup>();
+
+            GameObject settDialogGo = new GameObject("DialogBox");
+            settDialogGo.transform.SetParent(settModalGo.transform, false);
+            RectTransform settDialogRect = settDialogGo.AddComponent<RectTransform>();
+            settDialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            settDialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            settDialogRect.pivot = new Vector2(0.5f, 0.5f);
+            settDialogRect.sizeDelta = new Vector2(860f, 560f);
+
+            Image settDialogBg = settDialogGo.AddComponent<Image>();
+            settDialogBg.color = new Color(0.07f, 0.10f, 0.17f, 0.98f);
+
+            GameObject settHeaderGo = new GameObject("Header");
+            settHeaderGo.transform.SetParent(settDialogGo.transform, false);
+            RectTransform settHeaderRect = settHeaderGo.AddComponent<RectTransform>();
+            settHeaderRect.anchorMin = new Vector2(0f, 0.85f);
+            settHeaderRect.anchorMax = new Vector2(1f, 1f);
+            settHeaderRect.offsetMin = Vector2.zero;
+            settHeaderRect.offsetMax = Vector2.zero;
+
+            Text settHeaderTxt = settHeaderGo.AddComponent<Text>();
+            settHeaderTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            settHeaderTxt.fontSize = 32;
+            settHeaderTxt.fontStyle = FontStyle.Bold;
+            settHeaderTxt.alignment = TextAnchor.MiddleCenter;
+            settHeaderTxt.color = new Color(0.22f, 0.74f, 0.97f, 1f);
+            settHeaderTxt.text = "SETTINGS";
+
+            // Row 1: Music Volume Slider
+            Slider musicSlider = CreateSettingsSliderRow(settDialogGo, "Music Volume", new Vector2(0f, 0.65f));
+
+            // Row 2: SFX Volume Slider
+            Slider sfxSlider = CreateSettingsSliderRow(settDialogGo, "SFX Volume", new Vector2(0f, 0.47f));
+
+            // Row 3: Vibration Toggle
+            CreateSettingsVibrationRow(settDialogGo, "Vibration", new Vector2(0f, 0.29f), out Button vibBtn, out Text vibTxt, out Image vibBg);
+
+            // Save & Close Settings Button
+            GameObject settCloseBtnGo = new GameObject("SaveCloseButton");
+            settCloseBtnGo.transform.SetParent(settDialogGo.transform, false);
+            RectTransform settCloseRect = settCloseBtnGo.AddComponent<RectTransform>();
+            settCloseRect.anchorMin = new Vector2(0.5f, 0.04f);
+            settCloseRect.anchorMax = new Vector2(0.5f, 0.04f);
+            settCloseRect.pivot = new Vector2(0.5f, 0f);
+            settCloseRect.sizeDelta = new Vector2(280f, 58f);
+
+            Image settCloseImg = settCloseBtnGo.AddComponent<Image>();
+            settCloseImg.color = new Color(0.06f, 0.73f, 0.51f, 1f); // Emerald #10B981
+            Button settCloseBtn = settCloseBtnGo.AddComponent<Button>();
+
+            GameObject settCloseTxtGo = new GameObject("Text");
+            settCloseTxtGo.transform.SetParent(settCloseBtnGo.transform, false);
+            RectTransform settCloseTxtRect = settCloseTxtGo.AddComponent<RectTransform>();
+            settCloseTxtRect.anchorMin = Vector2.zero;
+            settCloseTxtRect.anchorMax = Vector2.one;
+            settCloseTxtRect.offsetMin = Vector2.zero;
+            settCloseTxtRect.offsetMax = Vector2.zero;
+
+            Text settCloseTxt = settCloseTxtGo.AddComponent<Text>();
+            settCloseTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            settCloseTxt.fontSize = 22;
+            settCloseTxt.fontStyle = FontStyle.Bold;
+            settCloseTxt.alignment = TextAnchor.MiddleCenter;
+            settCloseTxt.color = Color.white;
+            settCloseTxt.text = "SAVE & CLOSE";
+
+            // Wire MainMenuUI Component References
+            SerializedObject soMenu = new SerializedObject(menuUI);
+            soMenu.FindProperty("playButton").objectReferenceValue = playBtn;
+            soMenu.FindProperty("statisticsButton").objectReferenceValue = statsBtn;
+            soMenu.FindProperty("settingsButton").objectReferenceValue = settBtn;
+            soMenu.FindProperty("bestScoreText").objectReferenceValue = bestTxt;
+
+            soMenu.FindProperty("statisticsPanel").objectReferenceValue = statsModalGo;
+            soMenu.FindProperty("statisticsCanvasGroup").objectReferenceValue = statsCg;
+            soMenu.FindProperty("statsBestScoreText").objectReferenceValue = statScoreVal;
+            soMenu.FindProperty("statsBestLengthText").objectReferenceValue = statLengthVal;
+            soMenu.FindProperty("statsGamesPlayedText").objectReferenceValue = statGamesVal;
+            soMenu.FindProperty("statsFoodCollectedText").objectReferenceValue = statFoodVal;
+            soMenu.FindProperty("statsAIDefeatedText").objectReferenceValue = statAIVal;
+            soMenu.FindProperty("statsCloseButton").objectReferenceValue = statsCloseBtn;
+
+            soMenu.FindProperty("settingsPanel").objectReferenceValue = settModalGo;
+            soMenu.FindProperty("settingsCanvasGroup").objectReferenceValue = settCg;
+            soMenu.FindProperty("musicVolumeSlider").objectReferenceValue = musicSlider;
+            soMenu.FindProperty("sfxVolumeSlider").objectReferenceValue = sfxSlider;
+            soMenu.FindProperty("vibrationToggleButton").objectReferenceValue = vibBtn;
+            soMenu.FindProperty("vibrationToggleText").objectReferenceValue = vibTxt;
+            soMenu.FindProperty("vibrationToggleBg").objectReferenceValue = vibBg;
+            soMenu.FindProperty("settingsCloseButton").objectReferenceValue = settCloseBtn;
+            soMenu.FindProperty("gameSceneName").stringValue = "Game";
+            soMenu.ApplyModifiedPropertiesWithoutUndo();
+
+            statsModalGo.SetActive(false);
+            settModalGo.SetActive(false);
+
+            // 4. EventSystem
+            GameObject eventSystemGo = new GameObject("EventSystem");
+            eventSystemGo.AddComponent<EventSystem>();
+            eventSystemGo.AddComponent<StandaloneInputModule>();
+
+            EditorSceneManager.SaveScene(scene, scenePath);
+            Debug.Log($"[GigaGrub] Saved MainMenu scene with Navigation, Statistics and Settings to {scenePath}");
+        }
+
+        private static Text CreateStatsRow(GameObject parent, string label, Vector2 anchorY, Color valColor)
+        {
+            GameObject rowGo = new GameObject($"Row_{label.Replace(" ", "")}");
+            rowGo.transform.SetParent(parent.transform, false);
+            RectTransform rowRect = rowGo.AddComponent<RectTransform>();
+            rowRect.anchorMin = new Vector2(0.08f, anchorY.y);
+            rowRect.anchorMax = new Vector2(0.92f, anchorY.y + 0.10f);
+            rowRect.offsetMin = Vector2.zero;
+            rowRect.offsetMax = Vector2.zero;
+
+            Image rowBg = rowGo.AddComponent<Image>();
+            rowBg.color = new Color(0.11f, 0.15f, 0.23f, 0.70f);
+
+            GameObject labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            RectTransform labelRect = labelGo.AddComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.04f, 0f);
+            labelRect.anchorMax = new Vector2(0.60f, 1f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            Text labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            labelTxt.fontSize = 24;
+            labelTxt.fontStyle = FontStyle.Bold;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.color = new Color(0.80f, 0.84f, 0.90f, 1f);
+            labelTxt.text = label;
+
+            GameObject valGo = new GameObject("Value");
+            valGo.transform.SetParent(rowGo.transform, false);
+            RectTransform valRect = valGo.AddComponent<RectTransform>();
+            valRect.anchorMin = new Vector2(0.60f, 0f);
+            valRect.anchorMax = new Vector2(0.96f, 1f);
+            valRect.offsetMin = Vector2.zero;
+            valRect.offsetMax = Vector2.zero;
+
+            Text valTxt = valGo.AddComponent<Text>();
+            valTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            valTxt.fontSize = 26;
+            valTxt.fontStyle = FontStyle.Bold;
+            valTxt.alignment = TextAnchor.MiddleRight;
+            valTxt.color = valColor;
+            valTxt.text = "0";
+
+            return valTxt;
+        }
+
+        private static Slider CreateSettingsSliderRow(GameObject parent, string label, Vector2 anchorY)
+        {
+            GameObject rowGo = new GameObject($"Row_{label.Replace(" ", "")}");
+            rowGo.transform.SetParent(parent.transform, false);
+            RectTransform rowRect = rowGo.AddComponent<RectTransform>();
+            rowRect.anchorMin = new Vector2(0.08f, anchorY.y);
+            rowRect.anchorMax = new Vector2(0.92f, anchorY.y + 0.12f);
+            rowRect.offsetMin = Vector2.zero;
+            rowRect.offsetMax = Vector2.zero;
+
+            Image rowBg = rowGo.AddComponent<Image>();
+            rowBg.color = new Color(0.11f, 0.15f, 0.23f, 0.70f);
+
+            GameObject labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            RectTransform labelRect = labelGo.AddComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.04f, 0f);
+            labelRect.anchorMax = new Vector2(0.40f, 1f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            Text labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            labelTxt.fontSize = 24;
+            labelTxt.fontStyle = FontStyle.Bold;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.color = new Color(0.80f, 0.84f, 0.90f, 1f);
+            labelTxt.text = label;
+
+            GameObject sliderGo = new GameObject("Slider");
+            sliderGo.transform.SetParent(rowGo.transform, false);
+            RectTransform sliderRect = sliderGo.AddComponent<RectTransform>();
+            sliderRect.anchorMin = new Vector2(0.42f, 0.25f);
+            sliderRect.anchorMax = new Vector2(0.96f, 0.75f);
+            sliderRect.offsetMin = Vector2.zero;
+            sliderRect.offsetMax = Vector2.zero;
+
+            Slider slider = sliderGo.AddComponent<Slider>();
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = 0.8f;
+
+            // Slider Background
+            GameObject bgTrackGo = new GameObject("Background");
+            bgTrackGo.transform.SetParent(sliderGo.transform, false);
+            RectTransform bgTrackRect = bgTrackGo.AddComponent<RectTransform>();
+            bgTrackRect.anchorMin = Vector2.zero;
+            bgTrackRect.anchorMax = Vector2.one;
+            bgTrackRect.offsetMin = Vector2.zero;
+            bgTrackRect.offsetMax = Vector2.zero;
+            Image bgTrackImg = bgTrackGo.AddComponent<Image>();
+            bgTrackImg.color = new Color(0.20f, 0.26f, 0.36f, 1f);
+
+            // Fill Area & Fill
+            GameObject fillAreaGo = new GameObject("Fill Area");
+            fillAreaGo.transform.SetParent(sliderGo.transform, false);
+            RectTransform fillAreaRect = fillAreaGo.AddComponent<RectTransform>();
+            fillAreaRect.anchorMin = Vector2.zero;
+            fillAreaRect.anchorMax = Vector2.one;
+            fillAreaRect.offsetMin = Vector2.zero;
+            fillAreaRect.offsetMax = Vector2.zero;
+
+            GameObject fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(fillAreaGo.transform, false);
+            RectTransform fillRect = fillGo.AddComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = Vector2.zero;
+            fillRect.offsetMax = Vector2.zero;
+            Image fillImg = fillGo.AddComponent<Image>();
+            fillImg.color = new Color(0.06f, 0.73f, 0.51f, 1f);
+
+            slider.fillRect = fillRect;
+            return slider;
+        }
+
+        private static void CreateSettingsVibrationRow(GameObject parent, string label, Vector2 anchorY, out Button vibBtn, out Text vibTxt, out Image vibBg)
+        {
+            GameObject rowGo = new GameObject($"Row_{label.Replace(" ", "")}");
+            rowGo.transform.SetParent(parent.transform, false);
+            RectTransform rowRect = rowGo.AddComponent<RectTransform>();
+            rowRect.anchorMin = new Vector2(0.08f, anchorY.y);
+            rowRect.anchorMax = new Vector2(0.92f, anchorY.y + 0.12f);
+            rowRect.offsetMin = Vector2.zero;
+            rowRect.offsetMax = Vector2.zero;
+
+            Image rowBg = rowGo.AddComponent<Image>();
+            rowBg.color = new Color(0.11f, 0.15f, 0.23f, 0.70f);
+
+            GameObject labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            RectTransform labelRect = labelGo.AddComponent<RectTransform>();
+            labelRect.anchorMin = new Vector2(0.04f, 0f);
+            labelRect.anchorMax = new Vector2(0.50f, 1f);
+            labelRect.offsetMin = Vector2.zero;
+            labelRect.offsetMax = Vector2.zero;
+
+            Text labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            labelTxt.fontSize = 24;
+            labelTxt.fontStyle = FontStyle.Bold;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.color = new Color(0.80f, 0.84f, 0.90f, 1f);
+            labelTxt.text = label;
+
+            GameObject toggleBtnGo = new GameObject("VibrationToggleButton");
+            toggleBtnGo.transform.SetParent(rowGo.transform, false);
+            RectTransform toggleRect = toggleBtnGo.AddComponent<RectTransform>();
+            toggleRect.anchorMin = new Vector2(0.70f, 0.18f);
+            toggleRect.anchorMax = new Vector2(0.96f, 0.82f);
+            toggleRect.offsetMin = Vector2.zero;
+            toggleRect.offsetMax = Vector2.zero;
+
+            vibBg = toggleBtnGo.AddComponent<Image>();
+            vibBg.color = new Color(0.10f, 0.85f, 0.45f, 1f); // Active Green
+            vibBtn = toggleBtnGo.AddComponent<Button>();
+
+            GameObject toggleTxtGo = new GameObject("Text");
+            toggleTxtGo.transform.SetParent(toggleBtnGo.transform, false);
+            RectTransform toggleTxtRect = toggleTxtGo.AddComponent<RectTransform>();
+            toggleTxtRect.anchorMin = Vector2.zero;
+            toggleTxtRect.anchorMax = Vector2.one;
+            toggleTxtRect.offsetMin = Vector2.zero;
+            toggleTxtRect.offsetMax = Vector2.zero;
+
+            vibTxt = toggleTxtGo.AddComponent<Text>();
+            vibTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            vibTxt.fontSize = 22;
+            vibTxt.fontStyle = FontStyle.Bold;
+            vibTxt.alignment = TextAnchor.MiddleCenter;
+            vibTxt.color = Color.white;
+            vibTxt.text = "ON";
         }
 
         [MenuItem("GigaGrub/9. Run Automated Verification Tests")]
@@ -1685,6 +2344,20 @@ namespace GigaGrub.Editor
 
             Assert(massiveSpawner.ActiveFoodCount >= 500, $"FoodSpawner successfully populated 500 active food items (actual: {massiveSpawner.ActiveFoodCount})");
 
+            // --- Section 12: SpatialGrid2D and Performance Query Verification ---
+            Assert(massiveSpawner.SpatialGrid != null, "FoodSpawner has an active SpatialGrid2D instance");
+            List<Food.Food> spatialResults = new List<Food.Food>(64);
+            massiveSpawner.SpatialGrid.QueryRadius(Vector2.zero, 12f, spatialResults);
+            Assert(spatialResults.Count > 0 && spatialResults.Count < massiveSpawner.ActiveFoodCount,
+                $"SpatialGrid2D QueryRadius returned localized bucket results ({spatialResults.Count} items) instead of scanning all 500 foods");
+
+            // Verify AIWorldDetector fast spatial food lookup
+            GameObject aiSpatialGo = Object.Instantiate(aiPrefab, Vector3.zero, Quaternion.identity);
+            AIWorldDetector aiDetector = aiSpatialGo.GetComponent<AIWorldDetector>();
+            bool foodFound = aiDetector.FindBestNearbyFood(Vector2.zero, out Vector2 foundPos);
+            Assert(foodFound, "AIWorldDetector successfully detected nearby food via SpatialGrid2D");
+            Object.DestroyImmediate(aiSpatialGo);
+
             // 4. Particle & Death Effect Pooling Stress Test
             for (int i = 0; i < 20; i++)
             {
@@ -1697,6 +2370,81 @@ namespace GigaGrub.Editor
                 DeathEffect d = DeathEffect.Spawn(new Vector3(0, i, 0), Color.red, 2f);
                 Assert(d != null, "DeathEffect spawned from pool");
             }
+
+            // --- Section 13: Local Save System, Versioning & Corruption Recovery ---
+            string testSavePath = System.IO.Path.Combine(Application.temporaryCachePath, "test_gigagrub_save.json");
+            if (System.IO.File.Exists(testSavePath))
+            {
+                System.IO.File.Delete(testSavePath);
+            }
+
+            GameObject testSaveMgrGo = new GameObject("TestSaveManager");
+            SaveManager testSaveMgr = testSaveMgrGo.AddComponent<SaveManager>();
+            testSaveMgr.SetCustomSavePath(testSavePath);
+            testSaveMgr.Initialize();
+
+            // 1. First Launch Defaults Verification
+            Assert(testSaveMgr.Statistics.BestScore == 0, "SaveManager first launch initializes BestScore to 0");
+            Assert(testSaveMgr.Statistics.BestLength == 10, "SaveManager first launch initializes BestLength to default 10");
+            Assert(testSaveMgr.Statistics.TotalGamesPlayed == 0, "SaveManager first launch initializes TotalGamesPlayed to 0");
+            Assert(testSaveMgr.Statistics.TotalFoodCollected == 0, "SaveManager first launch initializes TotalFoodCollected to 0");
+            Assert(testSaveMgr.Statistics.TotalAIDefeated == 0, "SaveManager first launch initializes TotalAIDefeated to 0");
+            Assert(testSaveMgr.Statistics.Version == 1, "SaveManager first launch has valid save Version 1");
+
+            // 2. Game Session Recording & Persistence across Simulated App Restart
+            testSaveMgr.RecordGameSession(score: 350, length: 42, foodCollected: 25, aiDefeated: 5);
+            Assert(testSaveMgr.Statistics.BestScore == 350, "SaveManager recorded session BestScore 350");
+            Assert(testSaveMgr.Statistics.BestLength == 42, "SaveManager recorded session BestLength 42");
+            Assert(testSaveMgr.Statistics.TotalGamesPlayed == 1, "SaveManager incremented TotalGamesPlayed to 1");
+            Assert(testSaveMgr.Statistics.TotalFoodCollected == 25, "SaveManager added TotalFoodCollected to 25");
+            Assert(testSaveMgr.Statistics.TotalAIDefeated == 5, "SaveManager added TotalAIDefeated to 5");
+
+            // Simulate restart by loading save file from fresh SaveManager instance
+            GameObject restartSaveMgrGo = new GameObject("RestartSaveManager");
+            SaveManager restartSaveMgr = restartSaveMgrGo.AddComponent<SaveManager>();
+            restartSaveMgr.SetCustomSavePath(testSavePath);
+            restartSaveMgr.Initialize();
+
+            Assert(restartSaveMgr.Statistics.BestScore == 350, "Simulated Restart: Restored persisted BestScore 350");
+            Assert(restartSaveMgr.Statistics.BestLength == 42, "Simulated Restart: Restored persisted BestLength 42");
+            Assert(restartSaveMgr.Statistics.TotalGamesPlayed == 1, "Simulated Restart: Restored persisted TotalGamesPlayed 1");
+            Assert(restartSaveMgr.Statistics.TotalFoodCollected == 25, "Simulated Restart: Restored persisted TotalFoodCollected 25");
+            Assert(restartSaveMgr.Statistics.TotalAIDefeated == 5, "Simulated Restart: Restored persisted TotalAIDefeated 5");
+
+            // 3. Negative Value Sanitization Verification
+            GigaGrub.Data.SaveData negativeData = new GigaGrub.Data.SaveData
+            {
+                BestScore = -100,
+                BestLength = -5,
+                TotalGamesPlayed = -1,
+                TotalFoodCollected = -50,
+                TotalAIDefeated = -3,
+                Version = 0
+            };
+            bool sanitized = negativeData.ValidateAndSanitize();
+            Assert(sanitized, "ValidateAndSanitize detected and corrected negative values");
+            Assert(negativeData.BestScore == 0, "Sanitization clamped negative BestScore to 0");
+            Assert(negativeData.BestLength == 0, "Sanitization clamped negative BestLength to 0");
+            Assert(negativeData.TotalGamesPlayed == 0, "Sanitization clamped negative TotalGamesPlayed to 0");
+            Assert(negativeData.TotalFoodCollected == 0, "Sanitization clamped negative TotalFoodCollected to 0");
+            Assert(negativeData.TotalAIDefeated == 0, "Sanitization clamped negative TotalAIDefeated to 0");
+            Assert(negativeData.Version == 1, "Sanitization restored valid schema Version 1");
+
+            // 4. Corrupted Save Data Graceful Fallback Verification
+            System.IO.File.WriteAllText(testSavePath, "{ THIS IS CORRUPT UNPARSEABLE JSON $$$### }");
+            GameObject corruptSaveMgrGo = new GameObject("CorruptSaveManager");
+            SaveManager corruptSaveMgr = corruptSaveMgrGo.AddComponent<SaveManager>();
+            corruptSaveMgr.SetCustomSavePath(testSavePath);
+            corruptSaveMgr.Initialize();
+
+            Assert(corruptSaveMgr.Statistics.BestScore == 0, "Corrupted Save Recovery: Restored default BestScore without crash");
+            Assert(corruptSaveMgr.Statistics.TotalGamesPlayed == 0, "Corrupted Save Recovery: Restored default TotalGamesPlayed without crash");
+
+            // Cleanup SaveManager test instances & files
+            testSaveMgr.DeleteSaveFile();
+            Object.DestroyImmediate(corruptSaveMgrGo);
+            Object.DestroyImmediate(restartSaveMgrGo);
+            Object.DestroyImmediate(testSaveMgrGo);
 
             // Clean up test instances
             massiveSpawner.ClearAllActiveFood();
@@ -1724,11 +2472,100 @@ namespace GigaGrub.Editor
             Object.DestroyImmediate(victimAI);
             for (int i = 0; i < tenAIs.Count; i++) Object.DestroyImmediate(tenAIs[i]);
             for (int i = 0; i < fiveAIs.Count; i++) Object.DestroyImmediate(fiveAIs[i]);
-            Object.DestroyImmediate(ai1Go);
-            Object.DestroyImmediate(testFoodGo);
-            Object.DestroyImmediate(testPlayer);
-            Object.DestroyImmediate(scoreMgrGo);
-            Object.DestroyImmediate(spawnerGo);
+            // --- Section 14: MainMenu UI & Settings Verification ---
+            GameObject testMenuCanvasGo = new GameObject("TestMainMenuCanvas");
+            MainMenuUI testMenuUI = testMenuCanvasGo.AddComponent<MainMenuUI>();
+
+            // Setup mock buttons and text for test execution
+            GameObject mockPlayGo = new GameObject("MockPlay");
+            Button mockPlayBtn = mockPlayGo.AddComponent<Button>();
+            GameObject mockStatsBtnGo = new GameObject("MockStats");
+            Button mockStatsBtn = mockStatsBtnGo.AddComponent<Button>();
+            GameObject mockSettBtnGo = new GameObject("MockSett");
+            Button mockSettBtn = mockSettBtnGo.AddComponent<Button>();
+            GameObject mockBestTxtGo = new GameObject("MockBest");
+            Text mockBestTxt = mockBestTxtGo.AddComponent<Text>();
+
+            GameObject mockStatsPanelGo = new GameObject("MockStatsPanel");
+            CanvasGroup mockStatsCg = mockStatsPanelGo.AddComponent<CanvasGroup>();
+            GameObject mockScoreTxtGo = new GameObject("MockScoreTxt");
+            Text mockScoreTxt = mockScoreTxtGo.AddComponent<Text>();
+            GameObject mockCloseStatsGo = new GameObject("MockCloseStats");
+            Button mockCloseStatsBtn = mockCloseStatsGo.AddComponent<Button>();
+
+            GameObject mockSettPanelGo = new GameObject("MockSettPanel");
+            CanvasGroup mockSettCg = mockSettPanelGo.AddComponent<CanvasGroup>();
+            GameObject mockMusicGo = new GameObject("MockMusic");
+            Slider mockMusicSlider = mockMusicGo.AddComponent<Slider>();
+            GameObject mockSfxGo = new GameObject("MockSfx");
+            Slider mockSfxSlider = mockSfxGo.AddComponent<Slider>();
+            GameObject mockVibGo = new GameObject("MockVib");
+            Image mockVibBg = mockVibGo.AddComponent<Image>();
+            Button mockVibBtn = mockVibGo.AddComponent<Button>();
+            GameObject mockVibTxtGo = new GameObject("MockVibTxt");
+            Text mockVibTxt = mockVibTxtGo.AddComponent<Text>();
+            GameObject mockCloseSettGo = new GameObject("MockCloseSett");
+            Button mockCloseSettBtn = mockCloseSettGo.AddComponent<Button>();
+
+            SerializedObject soTestMenu = new SerializedObject(testMenuUI);
+            soTestMenu.FindProperty("playButton").objectReferenceValue = mockPlayBtn;
+            soTestMenu.FindProperty("statisticsButton").objectReferenceValue = mockStatsBtn;
+            soTestMenu.FindProperty("settingsButton").objectReferenceValue = mockSettBtn;
+            soTestMenu.FindProperty("bestScoreText").objectReferenceValue = mockBestTxt;
+
+            soTestMenu.FindProperty("statisticsPanel").objectReferenceValue = mockStatsPanelGo;
+            soTestMenu.FindProperty("statisticsCanvasGroup").objectReferenceValue = mockStatsCg;
+            soTestMenu.FindProperty("statsBestScoreText").objectReferenceValue = mockScoreTxt;
+            soTestMenu.FindProperty("statsCloseButton").objectReferenceValue = mockCloseStatsBtn;
+
+            soTestMenu.FindProperty("settingsPanel").objectReferenceValue = mockSettPanelGo;
+            soTestMenu.FindProperty("settingsCanvasGroup").objectReferenceValue = mockSettCg;
+            soTestMenu.FindProperty("musicVolumeSlider").objectReferenceValue = mockMusicSlider;
+            soTestMenu.FindProperty("sfxVolumeSlider").objectReferenceValue = mockSfxSlider;
+            soTestMenu.FindProperty("vibrationToggleButton").objectReferenceValue = mockVibBtn;
+            soTestMenu.FindProperty("vibrationToggleText").objectReferenceValue = mockVibTxt;
+            soTestMenu.FindProperty("vibrationToggleBg").objectReferenceValue = mockVibBg;
+            soTestMenu.FindProperty("settingsCloseButton").objectReferenceValue = mockCloseSettBtn;
+            soTestMenu.ApplyModifiedPropertiesWithoutUndo();
+
+            // 1. Refresh & UI Open/Close Verification
+            testMenuUI.RefreshAllViews();
+            Assert(mockBestTxt.text.Contains("BEST SCORE"), "MainMenuUI displays Best Score badge");
+
+            testMenuUI.OpenStatistics();
+            Assert(mockStatsPanelGo.activeSelf, "MainMenuUI opens Statistics modal");
+            testMenuUI.CloseStatistics();
+            Assert(!mockStatsPanelGo.activeSelf, "MainMenuUI closes Statistics modal");
+
+            testMenuUI.OpenSettings();
+            Assert(mockSettPanelGo.activeSelf, "MainMenuUI opens Settings modal");
+            testMenuUI.CloseSettings();
+            Assert(!mockSettPanelGo.activeSelf, "MainMenuUI closes Settings modal");
+
+            // 2. Settings Persistence Verification
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.SetSettings(0.65f, 0.45f, false);
+                Assert(Mathf.Approximately(SaveManager.Instance.Statistics.MusicVolume, 0.65f), "Persisted Music Volume to 0.65");
+                Assert(Mathf.Approximately(SaveManager.Instance.Statistics.SFXVolume, 0.45f), "Persisted SFX Volume to 0.45");
+                Assert(!SaveManager.Instance.Statistics.VibrationEnabled, "Persisted Vibration setting to OFF");
+            }
+
+            // Cleanup mock menu objects
+            Object.DestroyImmediate(mockPlayGo);
+            Object.DestroyImmediate(mockStatsBtnGo);
+            Object.DestroyImmediate(mockSettBtnGo);
+            Object.DestroyImmediate(mockBestTxtGo);
+            Object.DestroyImmediate(mockCloseStatsGo);
+            Object.DestroyImmediate(mockScoreTxtGo);
+            Object.DestroyImmediate(mockStatsPanelGo);
+            Object.DestroyImmediate(mockCloseSettGo);
+            Object.DestroyImmediate(mockVibTxtGo);
+            Object.DestroyImmediate(mockVibGo);
+            Object.DestroyImmediate(mockSfxGo);
+            Object.DestroyImmediate(mockMusicGo);
+            Object.DestroyImmediate(mockSettPanelGo);
+            Object.DestroyImmediate(testMenuCanvasGo);
 
             Debug.Log("=== [GigaGrub Verification Tests] ALL TESTS PASSED! ===");
         }

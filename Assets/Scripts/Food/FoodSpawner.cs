@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using GigaGrub.Core;
 using GigaGrub.Player;
+using GigaGrub.Systems;
 
 namespace GigaGrub.Food
 {
@@ -56,10 +57,12 @@ namespace GigaGrub.Food
         private readonly List<float> accumulatedWeights = new List<float>();
         private float totalSpawnWeight;
         private int pendingRespawns = 0;
+        private SpatialGrid2D<Food> spatialGrid;
 
         public int ActiveFoodCount => activeFoods.Count;
         public int TotalPoolCount => pool.Count + activeFoods.Count;
         public IReadOnlyList<Food> ActiveFoods => activeFoods;
+        public SpatialGrid2D<Food> SpatialGrid => spatialGrid;
 
         public static void SetInstanceForTest(FoodSpawner spawner)
         {
@@ -83,6 +86,13 @@ namespace GigaGrub.Food
                 GameObject parentGo = new GameObject("FoodPool");
                 foodParent = parentGo.transform;
             }
+
+            Vector2 arenaHalf = Vector2.one * 55f;
+            if (ArenaManager.Instance != null)
+            {
+                arenaHalf = ArenaManager.Instance.HalfSize + Vector2.one * 5f;
+            }
+            spatialGrid = new SpatialGrid2D<Food>(-arenaHalf, arenaHalf, cellSize: 10f);
 
             RebuildWeightTable();
             PrewarmPool(maxFoodCount + 10);
@@ -206,6 +216,10 @@ namespace GigaGrub.Food
             food.OnSpawn(position);
 
             activeFoods.Add(food);
+            if (spatialGrid != null)
+            {
+                spatialGrid.Insert(food, position);
+            }
             return food;
         }
 
@@ -303,6 +317,10 @@ namespace GigaGrub.Food
         {
             if (activeFoods.Remove(food))
             {
+                if (spatialGrid != null)
+                {
+                    spatialGrid.Remove(food, food.transform.position);
+                }
                 pool.Enqueue(food);
 
                 // Queue respawn if population is below minimum or target
@@ -344,6 +362,11 @@ namespace GigaGrub.Food
 
         public void ClearAllActiveFood()
         {
+            if (spatialGrid != null)
+            {
+                spatialGrid.Clear();
+            }
+
             for (int i = activeFoods.Count - 1; i >= 0; i--)
             {
                 Food food = activeFoods[i];

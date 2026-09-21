@@ -21,6 +21,8 @@ namespace GigaGrub.Food
 
         public event Action<Food> OnConsumed;
 
+        private static int playerLayer = -1;
+
         private void Awake()
         {
             if (spriteRenderer == null)
@@ -33,14 +35,19 @@ namespace GigaGrub.Food
                 circleCollider = GetComponent<CircleCollider2D>();
             }
 
+            if (playerLayer < 0)
+            {
+                playerLayer = LayerMask.NameToLayer("Player");
+            }
+
             randomOffset = UnityEngine.Random.Range(0f, 10f);
         }
 
         private void Update()
         {
-            if (isConsumed || data == null || !data.EnablePulse) return;
+            if (isConsumed || data == null) return;
 
-            // Subtle pulsing animation (low CPU calculation, zero allocation)
+            // Subtle pulsing animation (only active for special food with EnablePulse)
             float sine = Mathf.Sin((Time.time + randomOffset) * data.PulseSpeed);
             float scaleMod = 1f + (sine * data.PulseMagnitude);
             transform.localScale = baseScale * scaleMod;
@@ -82,6 +89,13 @@ namespace GigaGrub.Food
                     circleCollider.radius = 0.35f * data.ScaleMultiplier;
                     circleCollider.enabled = true;
                 }
+
+                // Enable MonoBehaviour Update only if this food data actually has pulsing enabled
+                this.enabled = data.EnablePulse;
+            }
+            else
+            {
+                this.enabled = false;
             }
         }
 
@@ -95,6 +109,15 @@ namespace GigaGrub.Food
                 circleCollider.enabled = true;
             }
 
+            if (data != null && data.EnablePulse)
+            {
+                this.enabled = true;
+            }
+            else
+            {
+                this.enabled = false;
+            }
+
             gameObject.SetActive(true);
         }
 
@@ -103,6 +126,8 @@ namespace GigaGrub.Food
             // Thread & frame-safe atomic check: avoid duplicate consumption & duplicate score
             if (isConsumed) return;
             isConsumed = true;
+
+            this.enabled = false;
 
             if (circleCollider != null)
             {
@@ -121,6 +146,7 @@ namespace GigaGrub.Food
 
         public void OnReturnToPool()
         {
+            this.enabled = false;
             gameObject.SetActive(false);
         }
 
@@ -128,8 +154,8 @@ namespace GigaGrub.Food
         {
             if (isConsumed) return;
 
-            // Check if player or AI creature head triggered this food
-            if (other.CompareTag("Player") || other.CompareTag("AICreature") || other.gameObject.layer == LayerMask.NameToLayer("Player"))
+            // Fast tag / layer check without redundant string or layer conversions
+            if (other.CompareTag("Player") || other.CompareTag("AICreature") || (playerLayer >= 0 && other.gameObject.layer == playerLayer))
             {
                 PlayerBody body = other.GetComponent<PlayerBody>();
                 if (body == null)

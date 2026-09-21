@@ -92,11 +92,22 @@ namespace GigaGrub.Systems
 
         private void LoadHighScore()
         {
-            highScore = PlayerPrefs.GetInt(highScoreKey, 0);
+            if (SaveManager.Instance != null)
+            {
+                highScore = SaveManager.Instance.Statistics.BestScore;
+            }
+            else
+            {
+                highScore = PlayerPrefs.GetInt(highScoreKey, 0);
+            }
         }
 
         private void SaveHighScore()
         {
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.Statistics.RecordGameSession(highScore, 0, 0, 0);
+            }
             PlayerPrefs.SetInt(highScoreKey, highScore);
             PlayerPrefs.Save();
         }

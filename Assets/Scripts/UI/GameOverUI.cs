@@ -123,7 +123,15 @@ namespace GigaGrub.UI
 
             if (bestScoreText != null)
             {
-                int best = Systems.ScoreManager.Instance != null ? Systems.ScoreManager.Instance.HighScore : stats.FinalScore;
+                int best = stats.FinalScore;
+                if (Systems.SaveManager.Instance != null)
+                {
+                    best = Systems.SaveManager.Instance.Statistics.BestScore;
+                }
+                else if (Systems.ScoreManager.Instance != null)
+                {
+                    best = Systems.ScoreManager.Instance.HighScore;
+                }
                 bestScoreText.text = $"{best:N0}";
             }
 

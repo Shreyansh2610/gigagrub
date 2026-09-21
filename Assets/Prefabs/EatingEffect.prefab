@@ -2334,6 +2334,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Food.EatingEffect
   spriteRenderer: {fileID: 0}
+  particleRenderers: []
   duration: 0.28
-  startScale: 0.4
-  endScale: 1.6
+  startScale: 0.3
+  endScale: 1.7
+  particleSpread: 1.2

@@ -339,21 +339,79 @@ namespace GigaGrub.Player
 
         private void UpdateSegments()
         {
-            if (activeSegments.Count == 0 || trailCount == 0 || headTransform == null) return;
+            int segmentCount = activeSegments.Count;
+            if (segmentCount == 0 || trailCount == 0 || headTransform == null) return;
 
             Vector3 currentHeadPos = headTransform.position;
             Quaternion currentHeadRot = headTransform.rotation;
 
-            for (int i = 0; i < activeSegments.Count; i++)
+            float accumulatedDistance = 0f;
+            Vector3 prevPos = currentHeadPos;
+            Quaternion prevRot = currentHeadRot;
+            int trailIndex = 0;
+
+            // Pre-calculate stable extrapolation fallback direction
+            Vector3 tailBackwardDir = -(currentHeadRot * Vector3.up);
+            if (trailCount >= 2)
+            {
+                int lastIdx = (trailHead - (trailCount - 1) + trailBuffer.Length) % trailBuffer.Length;
+                int prevIdx = (trailHead - (trailCount - 2) + trailBuffer.Length) % trailBuffer.Length;
+                Vector3 diff = trailBuffer[lastIdx].Position - trailBuffer[prevIdx].Position;
+                if (diff.sqrMagnitude > 0.0001f)
+                {
+                    tailBackwardDir = diff.normalized;
+                }
+            }
+
+            for (int i = 0; i < segmentCount; i++)
             {
                 float targetDistance = (i + 1) * segmentSpacing;
-                GetPointAtDistance(currentHeadPos, currentHeadRot, targetDistance, out Vector3 targetPos, out Quaternion targetRot);
+                Vector3 targetPos;
+                Quaternion targetRot;
+                bool found = false;
 
-                PlayerSegment segment = activeSegments[i];
-                if (segment != null)
+                while (trailIndex < trailCount)
                 {
-                    segment.transform.position = targetPos;
-                    segment.transform.rotation = targetRot;
+                    int bufferIdx = (trailHead - trailIndex + trailBuffer.Length) % trailBuffer.Length;
+                    TrailPoint point = trailBuffer[bufferIdx];
+
+                    float segDist = Vector3.Distance(prevPos, point.Position);
+                    if (accumulatedDistance + segDist >= targetDistance)
+                    {
+                        float remaining = targetDistance - accumulatedDistance;
+                        float t = segDist > 0.0001f ? remaining / segDist : 0f;
+
+                        targetPos = Vector3.Lerp(prevPos, point.Position, t);
+                        targetRot = Quaternion.Slerp(prevRot, point.Rotation, t);
+                        found = true;
+
+                        PlayerSegment segment = activeSegments[i];
+                        if (segment != null)
+                        {
+                            segment.transform.position = targetPos;
+                            segment.transform.rotation = targetRot;
+                        }
+                        break;
+                    }
+
+                    accumulatedDistance += segDist;
+                    prevPos = point.Position;
+                    prevRot = point.Rotation;
+                    trailIndex++;
+                }
+
+                if (!found)
+                {
+                    float remainingExtrapDist = targetDistance - accumulatedDistance;
+                    targetPos = prevPos + tailBackwardDir * remainingExtrapDist;
+                    targetRot = prevRot;
+
+                    PlayerSegment segment = activeSegments[i];
+                    if (segment != null)
+                    {
+                        segment.transform.position = targetPos;
+                        segment.transform.rotation = targetRot;
+                    }
                 }
             }
         }

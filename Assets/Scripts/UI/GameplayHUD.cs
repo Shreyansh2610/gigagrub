@@ -254,26 +254,35 @@ namespace GigaGrub.UI
             RefreshAllDisplays();
         }
 
+        private int lastScore = -1;
+        private int lastLength = -1;
+        private int lastRank = -1;
+        private int lastTotal = -1;
+
         private void UpdateScoreDisplay(int score)
         {
-            if (scoreText != null)
+            if (scoreText != null && score != lastScore)
             {
+                lastScore = score;
                 scoreText.text = $"SCORE  {score:N0}";
             }
         }
 
         private void UpdateRankDisplay(int rank, int total)
         {
-            if (rankText != null)
+            if (rankText != null && (rank != lastRank || total != lastTotal))
             {
+                lastRank = rank;
+                lastTotal = total;
                 rankText.text = $"RANK  #{rank} / {total}";
             }
         }
 
         private void UpdateLengthDisplay(int length)
         {
-            if (lengthText != null)
+            if (lengthText != null && length != lastLength)
             {
+                lastLength = length;
                 lengthText.text = $"LENGTH  {length}";
             }
         }

@@ -52,6 +52,8 @@ namespace GigaGrub.Core
         [SerializeField] private GameplayHUD gameplayHUD;
         [SerializeField] private ScoreUI scoreUI;
 
+        [SerializeField] private SaveManager saveManager;
+
         [Header("Initial Configuration")]
         [SerializeField] private Vector2 playerSpawnPoint = Vector2.zero;
         [SerializeField] private int initialAICount = 10;
@@ -141,6 +143,11 @@ namespace GigaGrub.Core
             if (rankingManager == null)
             {
                 rankingManager = FindAnyObjectByType<RankingManager>();
+            }
+
+            if (saveManager == null)
+            {
+                saveManager = FindAnyObjectByType<SaveManager>();
             }
 
             if (cameraFollow == null)
@@ -254,6 +261,12 @@ namespace GigaGrub.Core
                 FoodCollected = foodCollected
             };
 
+            // Persist session stats to SaveManager
+            if (SaveManager.Instance != null)
+            {
+                SaveManager.Instance.RecordGameSession(finalScore, finalLength, foodCollected, aiCreaturesDefeated);
+            }
+
             if (pauseMenuUI != null)
             {
                 pauseMenuUI.Hide();
@@ -345,15 +358,21 @@ namespace GigaGrub.Core
         {
             Time.timeScale = 1f;
 
-            // If there is a separate MainMenu scene, load it, otherwise reload active scene cleanly
-            int activeSceneIndex = SceneManager.GetActiveScene().buildIndex;
-            if (activeSceneIndex >= 0)
+            if (SceneTransitionManager.Instance != null)
             {
-                SceneManager.LoadScene(activeSceneIndex);
+                SceneTransitionManager.Instance.TransitionToScene("MainMenu");
             }
             else
             {
-                RestartGame();
+                // Fallback direct load
+                try
+                {
+                    SceneManager.LoadScene("MainMenu");
+                }
+                catch
+                {
+                    RestartGame();
+                }
             }
         }
     }

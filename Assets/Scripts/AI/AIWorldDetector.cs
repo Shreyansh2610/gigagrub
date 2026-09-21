@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using GigaGrub.Core;
 using GigaGrub.Food;
@@ -175,17 +176,35 @@ namespace GigaGrub.AI
             return false;
         }
 
+        private static readonly System.Collections.Generic.List<Food.Food> foodQueryBuffer = new System.Collections.Generic.List<Food.Food>(64);
+
         public bool FindBestNearbyFood(Vector2 currentPosition, out Vector2 foodPosition)
         {
             foodPosition = Vector2.zero;
 
-            if (FoodSpawner.Instance == null || FoodSpawner.Instance.ActiveFoods == null)
+            if (FoodSpawner.Instance == null)
             {
                 return false;
             }
 
-            var activeFoods = FoodSpawner.Instance.ActiveFoods;
-            int count = activeFoods.Count;
+            var spatialGrid = FoodSpawner.Instance.SpatialGrid;
+            IReadOnlyList<Food.Food> foodCandidates;
+            int count;
+
+            if (spatialGrid != null)
+            {
+                spatialGrid.QueryRadius(currentPosition, foodVisionRadius, foodQueryBuffer);
+                foodCandidates = foodQueryBuffer;
+                count = foodQueryBuffer.Count;
+            }
+            else
+            {
+                var activeFoods = FoodSpawner.Instance.ActiveFoods;
+                if (activeFoods == null) return false;
+                foodCandidates = activeFoods;
+                count = activeFoods.Count;
+            }
+
             if (count == 0) return false;
 
             float maxVisionSqr = foodVisionRadius * foodVisionRadius;
@@ -194,7 +213,7 @@ namespace GigaGrub.AI
 
             for (int i = 0; i < count; i++)
             {
-                Food.Food food = activeFoods[i];
+                Food.Food food = foodCandidates[i];
                 if (food == null || !food.gameObject.activeSelf || food.IsConsumed) continue;
 
                 Vector2 pos = food.transform.position;

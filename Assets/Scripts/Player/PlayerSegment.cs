@@ -21,6 +21,7 @@ namespace GigaGrub.Player
             {
                 spriteRenderer = GetComponent<SpriteRenderer>();
             }
+            this.enabled = false;
         }
 
         private float growthTimer = 0f;
@@ -29,37 +30,42 @@ namespace GigaGrub.Player
 
         private void Update()
         {
-            if (isScaling)
+            if (!isScaling)
             {
-                if (isGrowthPop)
-                {
-                    growthTimer += Time.deltaTime;
-                    float progress = Mathf.Clamp01(growthTimer / growthDuration);
-                    // Smooth overshoot ease-out: starts fast, overshoots to ~1.08, settles at 1.0
-                    float t = progress - 1f;
-                    float easeOutBack = (t * t * ((1.70158f + 1f) * t + 1.70158f) + 1f);
-                    currentScale = targetScale * Mathf.Max(0f, easeOutBack);
-                    transform.localScale = currentScale;
+                this.enabled = false;
+                return;
+            }
 
-                    if (progress >= 1f)
-                    {
-                        currentScale = targetScale;
-                        transform.localScale = targetScale;
-                        isScaling = false;
-                        isGrowthPop = false;
-                    }
+            if (isGrowthPop)
+            {
+                growthTimer += Time.deltaTime;
+                float progress = Mathf.Clamp01(growthTimer / growthDuration);
+                // Smooth overshoot ease-out: starts fast, overshoots to ~1.08, settles at 1.0
+                float t = progress - 1f;
+                float easeOutBack = (t * t * ((1.70158f + 1f) * t + 1.70158f) + 1f);
+                currentScale = targetScale * Mathf.Max(0f, easeOutBack);
+                transform.localScale = currentScale;
+
+                if (progress >= 1f)
+                {
+                    currentScale = targetScale;
+                    transform.localScale = targetScale;
+                    isScaling = false;
+                    isGrowthPop = false;
+                    this.enabled = false;
                 }
-                else
-                {
-                    currentScale = Vector3.Lerp(currentScale, targetScale, Time.deltaTime * scaleSpeed);
-                    transform.localScale = currentScale;
+            }
+            else
+            {
+                currentScale = Vector3.Lerp(currentScale, targetScale, Time.deltaTime * scaleSpeed);
+                transform.localScale = currentScale;
 
-                    if (Vector3.Distance(currentScale, targetScale) < 0.005f)
-                    {
-                        currentScale = targetScale;
-                        transform.localScale = targetScale;
-                        isScaling = false;
-                    }
+                if (Vector3.Distance(currentScale, targetScale) < 0.005f)
+                {
+                    currentScale = targetScale;
+                    transform.localScale = targetScale;
+                    isScaling = false;
+                    this.enabled = false;
                 }
             }
         }
@@ -105,10 +111,12 @@ namespace GigaGrub.Player
                 currentScale = targetScale;
                 transform.localScale = targetScale;
                 isScaling = false;
+                this.enabled = false;
             }
             else
             {
                 isScaling = true;
+                this.enabled = true;
             }
         }
 
@@ -129,6 +137,7 @@ namespace GigaGrub.Player
                 isScaling = true;
                 isGrowthPop = true;
                 growthTimer = 0f;
+                this.enabled = true;
             }
             else
             {
@@ -136,6 +145,7 @@ namespace GigaGrub.Player
                 transform.localScale = targetScale;
                 isScaling = false;
                 isGrowthPop = false;
+                this.enabled = false;
             }
 
             gameObject.SetActive(true);
@@ -146,6 +156,7 @@ namespace GigaGrub.Player
             isScaling = false;
             isGrowthPop = false;
             growthTimer = 0f;
+            this.enabled = false;
             gameObject.SetActive(false);
         }
     }

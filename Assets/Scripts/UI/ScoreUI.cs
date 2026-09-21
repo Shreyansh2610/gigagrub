@@ -136,9 +136,12 @@ namespace GigaGrub.UI
             UpdateLengthDisplay(length);
         }
 
+        private int lastDisplayedScoreInt = -1;
+        private int lastDisplayedLengthInt = -1;
+
         private void Update()
         {
-            // Smooth score number interpolation
+            // Smooth score number interpolation (only when score animation is in flight)
             if (Mathf.Abs(displayedScore - targetScore) > 0.1f)
             {
                 displayedScore = Mathf.MoveTowards(
@@ -153,12 +156,10 @@ namespace GigaGrub.UI
             if (scoreTransform != null && scoreTransform.localScale != originalScale)
             {
                 scoreTransform.localScale = Vector3.Lerp(scoreTransform.localScale, originalScale, Time.deltaTime * punchReturnSpeed);
-            }
-
-            // Periodic fallback check for length
-            if (lengthText != null && playerBody != null)
-            {
-                UpdateLengthDisplay(playerBody.CurrentLength);
+                if (Vector3.Distance(scoreTransform.localScale, originalScale) < 0.005f)
+                {
+                    scoreTransform.localScale = originalScale;
+                }
             }
         }
 
@@ -187,16 +188,18 @@ namespace GigaGrub.UI
 
         private void UpdateScoreDisplay(int value)
         {
-            if (scoreText != null)
+            if (scoreText != null && value != lastDisplayedScoreInt)
             {
+                lastDisplayedScoreInt = value;
                 scoreText.text = $"SCORE  {value:N0}";
             }
         }
 
         private void UpdateLengthDisplay(int length)
         {
-            if (lengthText != null)
+            if (lengthText != null && length != lastDisplayedLengthInt)
             {
+                lastDisplayedLengthInt = length;
                 lengthText.text = $"LENGTH  {length}";
             }
         }

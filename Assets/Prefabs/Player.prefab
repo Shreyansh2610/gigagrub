@@ -274,6 +274,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.PlayerController
   moveSpeed: 5
   turnSpeed: 360
+  turnDamping: 16
   headRadius: 0.5
   joystick: {fileID: 0}
 --- !u!114 &3530432816192107290
