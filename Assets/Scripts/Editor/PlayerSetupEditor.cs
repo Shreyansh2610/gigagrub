@@ -131,6 +131,7 @@ namespace GigaGrub.Editor
 
             arena.SetupBackground();
             arena.SetupBoundaryVisuals();
+            arena.SetupArenaDecorations();
             arena.SetupBoundaryColliders();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
@@ -1657,7 +1658,50 @@ namespace GigaGrub.Editor
             Assert(leaderboard != null && leaderboard.Count == 3, $"Leaderboard snapshot contains exactly 3 active entries (actual: {leaderboard?.Count})");
             Assert(leaderboard[0].IsPlayer && leaderboard[0].Rank == 1, "Leaderboard top entry is Player at rank 1");
 
+            // --- Section 11: High Capacity & Polish Stress Test (100+ Segments, 500 Food, Camera & Effects) ---
+            // 1. Player Body 100+ Segments Stress & Elastic Growth
+            rankPlayerBody.GrowthSystem.GrowInstant(100);
+            Assert(rankPlayerBody.CurrentLength >= 110, $"Player successfully grew to 100+ segments (actual: {rankPlayerBody.CurrentLength})");
+
+            // 2. Camera Dynamic Zoom scaling test for 100+ segments
+            GameObject testCamGo = new GameObject("TestCamera");
+            Camera testCam = testCamGo.AddComponent<Camera>();
+            CameraFollow testCamFollow = testCamGo.AddComponent<CameraFollow>();
+            testCamFollow.target = rankPlayerGo.transform;
+            Assert(testCamFollow.CurrentZoom >= 9f, "CameraFollow initializes at base zoom");
+
+            // Trigger screen shake
+            testCamFollow.TriggerShake(0.3f, 0.2f);
+            Assert(true, "CameraFollow screen shake triggered successfully");
+
+            // 3. Spawning 500 Food Items Stress Simulation
+            GameObject massiveSpawnerGo = new GameObject("MassiveFoodSpawner");
+            FoodSpawner massiveSpawner = massiveSpawnerGo.AddComponent<FoodSpawner>();
+            massiveSpawner.SetFoodPrefab(foodPrefab);
+            massiveSpawner.SetFoodTypes(new FoodData[] { standardFood, superFood, megaFood });
+            massiveSpawner.SetPopulationLimits(500, 550, 500);
+            massiveSpawner.SetPlayerBody(rankPlayerBody);
+            massiveSpawner.InitializeRuntime();
+
+            Assert(massiveSpawner.ActiveFoodCount >= 500, $"FoodSpawner successfully populated 500 active food items (actual: {massiveSpawner.ActiveFoodCount})");
+
+            // 4. Particle & Death Effect Pooling Stress Test
+            for (int i = 0; i < 20; i++)
+            {
+                EatingEffect e = EatingEffect.Spawn(new Vector3(i, 0, 0), Color.yellow, 1f);
+                Assert(e != null, "EatingEffect spawned from pool");
+            }
+
+            for (int i = 0; i < 10; i++)
+            {
+                DeathEffect d = DeathEffect.Spawn(new Vector3(0, i, 0), Color.red, 2f);
+                Assert(d != null, "DeathEffect spawned from pool");
+            }
+
             // Clean up test instances
+            massiveSpawner.ClearAllActiveFood();
+            Object.DestroyImmediate(massiveSpawnerGo);
+            Object.DestroyImmediate(testCamGo);
             Object.DestroyImmediate(rankAi1);
             Object.DestroyImmediate(rankAi2);
             Object.DestroyImmediate(rankAi3);

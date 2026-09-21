@@ -245,7 +245,7 @@ namespace GigaGrub.Systems
 
         private PlayerBody FindPlayerBody()
         {
-            PlayerBody[] bodies = FindObjectsByType<PlayerBody>(FindObjectsSortMode.None);
+            PlayerBody[] bodies = FindObjectsByType<PlayerBody>(FindObjectsInactive.Exclude);
             for (int i = 0; i < bodies.Length; i++)
             {
                 if (bodies[i] != null && bodies[i].IsPlayer)

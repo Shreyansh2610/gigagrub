@@ -9,6 +9,9 @@ namespace GigaGrub.Core
         [Tooltip("Transform of the player to follow")]
         public Transform target;
 
+        [Tooltip("Forward lookahead distance based on creature orientation")]
+        [SerializeField] private float lookaheadDistance = 1.2f;
+
         [Tooltip("Speed of camera tracking interpolation")]
         [SerializeField] private float smoothSpeed = 8f;
 
@@ -28,6 +31,9 @@ namespace GigaGrub.Core
         [Tooltip("Speed of camera zoom interpolation")]
         [SerializeField] private float zoomSpeed = 4f;
 
+        [Tooltip("Enable dynamic zoom scaling as creature body grows longer")]
+        [SerializeField] private bool autoScaleZoomWithLength = true;
+
         [Header("Boundary Clamping")]
         [Tooltip("Whether camera should strictly clamp within ArenaManager bounds")]
         [SerializeField] private bool clampToArena = true;
@@ -35,6 +41,13 @@ namespace GigaGrub.Core
         private Camera cam;
         private float targetZoom;
         private Vector3 currentVelocity;
+        private Player.PlayerBody targetBody;
+
+        // Screen Shake state
+        private float shakeIntensity = 0f;
+        private float shakeDuration = 0f;
+        private float shakeTimer = 0f;
+        private Vector3 shakeOffset = Vector3.zero;
 
         public float CurrentZoom => cam != null ? cam.orthographicSize : defaultZoom;
         public float TargetZoom => targetZoom;
@@ -54,18 +67,63 @@ namespace GigaGrub.Core
             }
 
             targetZoom = defaultZoom;
+            ResolveTargetBody();
+        }
+
+        private void ResolveTargetBody()
+        {
+            if (target != null)
+            {
+                targetBody = target.GetComponent<Player.PlayerBody>();
+            }
         }
 
         private void LateUpdate()
         {
             if (cam == null) return;
 
+            UpdateShake();
             UpdateZoom();
             UpdatePosition();
         }
 
+        private void UpdateShake()
+        {
+            if (shakeTimer < shakeDuration)
+            {
+                shakeTimer += Time.deltaTime;
+                float damp = 1f - Mathf.Clamp01(shakeTimer / Mathf.Max(0.001f, shakeDuration));
+                float currentMag = shakeIntensity * damp;
+                shakeOffset = new Vector3(
+                    Random.Range(-currentMag, currentMag),
+                    Random.Range(-currentMag, currentMag),
+                    0f
+                );
+            }
+            else
+            {
+                shakeOffset = Vector3.zero;
+            }
+        }
+
         private void UpdateZoom()
         {
+            if (autoScaleZoomWithLength)
+            {
+                if (targetBody == null && target != null)
+                {
+                    ResolveTargetBody();
+                }
+
+                if (targetBody != null)
+                {
+                    // As length grows from 10 to 100+, scale zoom from 9.0 to ~13.5
+                    int length = targetBody.CurrentLength;
+                    float growthT = Mathf.Clamp01((length - 10) / 120f);
+                    targetZoom = Mathf.Lerp(defaultZoom, defaultZoom + 4.5f, growthT);
+                }
+            }
+
             targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
             cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetZoom, zoomSpeed * Time.deltaTime);
         }
@@ -74,7 +132,8 @@ namespace GigaGrub.Core
         {
             if (target == null) return;
 
-            Vector3 desiredPosition = target.position + offset;
+            Vector3 forwardLead = target.up * lookaheadDistance;
+            Vector3 desiredPosition = target.position + forwardLead + offset + shakeOffset;
 
             if (clampToArena && ArenaManager.Instance != null)
             {
@@ -89,6 +148,13 @@ namespace GigaGrub.Core
             {
                 transform.position = ClampCameraPosition(transform.position);
             }
+        }
+
+        public void TriggerShake(float intensity = 0.18f, float duration = 0.15f)
+        {
+            shakeIntensity = intensity;
+            shakeDuration = duration;
+            shakeTimer = 0f;
         }
 
         public Vector3 ClampCameraPosition(Vector3 rawPosition)

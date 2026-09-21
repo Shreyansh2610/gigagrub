@@ -95,23 +95,61 @@ namespace GigaGrub.UI
             }
         }
 
+        private float targetAlpha = 0f;
+        private Vector3 targetScale = Vector3.one;
+        private bool isTransitioning = false;
+
+        private void Update()
+        {
+            if (isTransitioning)
+            {
+                if (canvasGroup != null)
+                {
+                    canvasGroup.alpha = Mathf.MoveTowards(canvasGroup.alpha, targetAlpha, Time.unscaledDeltaTime * 6f);
+                }
+
+                if (rootPanel != null)
+                {
+                    rootPanel.transform.localScale = Vector3.Lerp(rootPanel.transform.localScale, targetScale, Time.unscaledDeltaTime * 12f);
+                }
+
+                if (canvasGroup != null && Mathf.Approximately(canvasGroup.alpha, targetAlpha))
+                {
+                    if (targetAlpha <= 0.01f && rootPanel != null)
+                    {
+                        rootPanel.SetActive(false);
+                    }
+                    isTransitioning = false;
+                }
+            }
+        }
+
         public void Show()
         {
             if (rootPanel != null)
             {
                 rootPanel.SetActive(true);
+                rootPanel.transform.localScale = Vector3.one * 0.94f;
             }
 
             if (canvasGroup != null)
             {
-                canvasGroup.alpha = 1f;
+                canvasGroup.alpha = 0f;
                 canvasGroup.interactable = true;
                 canvasGroup.blocksRaycasts = true;
             }
+
+            targetAlpha = 1f;
+            targetScale = Vector3.one;
+            isTransitioning = true;
         }
 
         public void Hide()
         {
+            targetAlpha = 0f;
+            targetScale = Vector3.one * 0.94f;
+            isTransitioning = true;
+
             if (canvasGroup != null)
             {
                 canvasGroup.alpha = 0f;

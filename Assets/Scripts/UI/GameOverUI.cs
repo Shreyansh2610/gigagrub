@@ -74,11 +74,51 @@ namespace GigaGrub.UI
             }
         }
 
+        private float targetAlpha = 0f;
+        private Vector3 targetScale = Vector3.one;
+        private bool isTransitioning = false;
+        private float animatedScore = 0f;
+        private int targetFinalScore = 0;
+
+        private void Update()
+        {
+            if (isTransitioning)
+            {
+                if (canvasGroup != null)
+                {
+                    canvasGroup.alpha = Mathf.MoveTowards(canvasGroup.alpha, targetAlpha, Time.unscaledDeltaTime * 4f);
+                }
+
+                if (rootPanel != null)
+                {
+                    rootPanel.transform.localScale = Vector3.Lerp(rootPanel.transform.localScale, targetScale, Time.unscaledDeltaTime * 10f);
+                }
+
+                if (canvasGroup != null && Mathf.Approximately(canvasGroup.alpha, targetAlpha))
+                {
+                    if (targetAlpha <= 0.01f && rootPanel != null)
+                    {
+                        rootPanel.SetActive(false);
+                    }
+                    isTransitioning = false;
+                }
+            }
+
+            if (finalScoreText != null && Mathf.Abs(animatedScore - targetFinalScore) > 0.5f)
+            {
+                animatedScore = Mathf.MoveTowards(animatedScore, targetFinalScore, Time.unscaledDeltaTime * Mathf.Max(100f, targetFinalScore * 3f));
+                finalScoreText.text = $"{Mathf.RoundToInt(animatedScore):N0}";
+            }
+        }
+
         public void Show(GameStats stats)
         {
+            targetFinalScore = stats.FinalScore;
+            animatedScore = 0f;
+
             if (finalScoreText != null)
             {
-                finalScoreText.text = $"{stats.FinalScore:N0}";
+                finalScoreText.text = "0";
             }
 
             if (bestScoreText != null)
@@ -110,18 +150,27 @@ namespace GigaGrub.UI
             if (rootPanel != null)
             {
                 rootPanel.SetActive(true);
+                rootPanel.transform.localScale = Vector3.one * 0.92f;
             }
 
             if (canvasGroup != null)
             {
-                canvasGroup.alpha = 1f;
+                canvasGroup.alpha = 0f;
                 canvasGroup.interactable = true;
                 canvasGroup.blocksRaycasts = true;
             }
+
+            targetAlpha = 1f;
+            targetScale = Vector3.one;
+            isTransitioning = true;
         }
 
         public void Hide()
         {
+            targetAlpha = 0f;
+            targetScale = Vector3.one * 0.92f;
+            isTransitioning = true;
+
             if (canvasGroup != null)
             {
                 canvasGroup.alpha = 0f;

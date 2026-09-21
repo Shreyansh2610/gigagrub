@@ -23,18 +23,43 @@ namespace GigaGrub.Player
             }
         }
 
+        private float growthTimer = 0f;
+        private float growthDuration = 0.22f;
+        private bool isGrowthPop = false;
+
         private void Update()
         {
             if (isScaling)
             {
-                currentScale = Vector3.Lerp(currentScale, targetScale, Time.deltaTime * scaleSpeed);
-                transform.localScale = currentScale;
-
-                if (Vector3.Distance(currentScale, targetScale) < 0.005f)
+                if (isGrowthPop)
                 {
-                    currentScale = targetScale;
-                    transform.localScale = targetScale;
-                    isScaling = false;
+                    growthTimer += Time.deltaTime;
+                    float progress = Mathf.Clamp01(growthTimer / growthDuration);
+                    // Smooth overshoot ease-out: starts fast, overshoots to ~1.08, settles at 1.0
+                    float t = progress - 1f;
+                    float easeOutBack = (t * t * ((1.70158f + 1f) * t + 1.70158f) + 1f);
+                    currentScale = targetScale * Mathf.Max(0f, easeOutBack);
+                    transform.localScale = currentScale;
+
+                    if (progress >= 1f)
+                    {
+                        currentScale = targetScale;
+                        transform.localScale = targetScale;
+                        isScaling = false;
+                        isGrowthPop = false;
+                    }
+                }
+                else
+                {
+                    currentScale = Vector3.Lerp(currentScale, targetScale, Time.deltaTime * scaleSpeed);
+                    transform.localScale = currentScale;
+
+                    if (Vector3.Distance(currentScale, targetScale) < 0.005f)
+                    {
+                        currentScale = targetScale;
+                        transform.localScale = targetScale;
+                        isScaling = false;
+                    }
                 }
             }
         }
@@ -102,12 +127,15 @@ namespace GigaGrub.Player
                 currentScale = Vector3.zero;
                 transform.localScale = Vector3.zero;
                 isScaling = true;
+                isGrowthPop = true;
+                growthTimer = 0f;
             }
             else
             {
                 currentScale = targetScale;
                 transform.localScale = targetScale;
                 isScaling = false;
+                isGrowthPop = false;
             }
 
             gameObject.SetActive(true);
@@ -116,6 +144,8 @@ namespace GigaGrub.Player
         public void OnReturnToPool()
         {
             isScaling = false;
+            isGrowthPop = false;
+            growthTimer = 0f;
             gameObject.SetActive(false);
         }
     }

@@ -30,7 +30,9 @@ namespace GigaGrub.Core
 
         public Rect Bounds => new Rect(-arenaSize.x * 0.5f, -arenaSize.y * 0.5f, arenaSize.x, arenaSize.y);
 
+        private Transform decorationsParent;
         private static Sprite solidSquareSprite;
+        private static Sprite arenaGridSprite;
 
         private void Awake()
         {
@@ -43,6 +45,7 @@ namespace GigaGrub.Core
 
             SetupBackground();
             SetupBoundaryVisuals();
+            SetupArenaDecorations();
             if (generateColliders)
             {
                 SetupBoundaryColliders();
@@ -159,6 +162,60 @@ namespace GigaGrub.Core
             };
 
             lineRenderer.SetPositions(corners);
+        }
+
+        public void SetupArenaDecorations()
+        {
+            if (decorationsParent != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(decorationsParent.gameObject);
+                else
+                    DestroyImmediate(decorationsParent.gameObject);
+            }
+
+            GameObject decGo = new GameObject("ArenaDecorations");
+            decGo.transform.SetParent(transform, false);
+            decorationsParent = decGo.transform;
+
+            Vector2 half = HalfSize;
+            float cornerSize = 3.5f;
+
+            // Create 4 sleek L-shaped corner accent lines
+            Vector2[] cornerPositions = new Vector2[]
+            {
+                new Vector2(-half.x + cornerSize * 0.5f, -half.y + cornerSize * 0.5f),
+                new Vector2( half.x - cornerSize * 0.5f, -half.y + cornerSize * 0.5f),
+                new Vector2( half.x - cornerSize * 0.5f,  half.y - cornerSize * 0.5f),
+                new Vector2(-half.x + cornerSize * 0.5f,  half.y - cornerSize * 0.5f)
+            };
+
+            for (int i = 0; i < 4; i++)
+            {
+                GameObject cornerMarker = new GameObject($"Corner_{i}");
+                cornerMarker.transform.SetParent(decorationsParent, false);
+                cornerMarker.transform.localPosition = cornerPositions[i];
+
+                LineRenderer clr = cornerMarker.AddComponent<LineRenderer>();
+                clr.useWorldSpace = false;
+                clr.positionCount = 3;
+                clr.startWidth = 0.15f;
+                clr.endWidth = 0.15f;
+                Color accent = new Color(boundaryColor.r, boundaryColor.g, boundaryColor.b, 0.45f);
+                clr.startColor = accent;
+                clr.endColor = accent;
+                clr.sortingOrder = -90;
+
+                float signX = (i == 0 || i == 3) ? 1f : -1f;
+                float signY = (i == 0 || i == 1) ? 1f : -1f;
+
+                clr.SetPositions(new Vector3[]
+                {
+                    new Vector3(0f, -signY * cornerSize * 0.5f, 0f),
+                    new Vector3(-signX * cornerSize * 0.5f, -signY * cornerSize * 0.5f, 0f),
+                    new Vector3(-signX * cornerSize * 0.5f, 0f, 0f)
+                });
+            }
         }
 
         public void SetupBoundaryColliders()

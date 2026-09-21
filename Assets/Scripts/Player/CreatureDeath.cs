@@ -101,7 +101,8 @@ namespace GigaGrub.Player
 
             // 4. Visual death explosion effect
             Vector3 headPos = transform.position;
-            EatingEffect.Spawn(headPos, new Color(1f, 0.2f, 0.2f, 1f), 2.2f);
+            Color deathColor = wasPlayer ? new Color(1f, 0.35f, 0.35f, 1f) : new Color(1f, 0.45f, 0.25f, 1f);
+            DeathEffect.Spawn(headPos, deathColor, 2.2f);
 
             // 5. Audio feedback
             if (audioSource != null && wasPlayer)

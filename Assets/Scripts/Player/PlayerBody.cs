@@ -566,6 +566,17 @@ namespace GigaGrub.Player
 
             // 5. Visual particle burst feedback
             EatingEffect.Spawn(transform.position, foodData.FoodColor, foodData.ScaleMultiplier);
+
+            // 6. Screen micro-feedback impulse (player only)
+            if (isPlayer && Camera.main != null)
+            {
+                CameraFollow cam = Camera.main.GetComponent<CameraFollow>();
+                if (cam != null)
+                {
+                    float shakeMag = foodData.FoodType == FoodType.Mega ? 0.25f : (foodData.FoodType == FoodType.Super ? 0.15f : 0.06f);
+                    cam.TriggerShake(shakeMag, 0.12f);
+                }
+            }
         }
 
         private void UpdateHeadPunch()

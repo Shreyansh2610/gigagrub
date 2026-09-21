@@ -13,6 +13,9 @@ namespace GigaGrub.Player
         [Tooltip("Steering angular rotation speed in degrees per second")]
         [SerializeField] private float turnSpeed = 360f;
 
+        [Tooltip("Smoothness factor for angular turn damping")]
+        [SerializeField] private float turnDamping = 16f;
+
         [Tooltip("Radius of the creature head for boundary collision")]
         [SerializeField] private float headRadius = 0.5f;
 
@@ -21,6 +24,8 @@ namespace GigaGrub.Player
         public VirtualJoystick joystick;
 
         private float currentSpeed;
+        private float targetSpeed;
+        private Quaternion targetRotation;
 
         public float CurrentSpeed => currentSpeed;
         public float BaseSpeed => moveSpeed;
@@ -30,6 +35,8 @@ namespace GigaGrub.Player
             // Optimize mobile framerate for smooth responsiveness
             Application.targetFrameRate = 60;
             currentSpeed = moveSpeed;
+            targetSpeed = moveSpeed;
+            targetRotation = transform.rotation;
         }
 
         private void Update()
@@ -62,19 +69,27 @@ namespace GigaGrub.Player
             {
                 // Calculate target angle (0 degrees = up/forward)
                 float targetAngle = Mathf.Atan2(-input.x, input.y) * Mathf.Rad2Deg;
-                Quaternion targetRotation = Quaternion.Euler(0f, 0f, targetAngle);
-
-                // Smoothly rotate towards target direction
-                transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation,
-                    targetRotation,
-                    turnSpeed * Time.deltaTime
-                );
+                targetRotation = Quaternion.Euler(0f, 0f, targetAngle);
             }
+
+            // Dual interpolation: Angular speed limit + exponential smoothing for ultra-smooth fluid steering
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation,
+                targetRotation,
+                turnSpeed * Time.deltaTime
+            );
+
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                targetRotation,
+                turnDamping * Time.deltaTime
+            );
         }
 
         private void HandleMovement()
         {
+            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, Time.deltaTime * 12f);
+
             // Continuous forward movement in the direction the creature is facing
             transform.position += transform.up * (currentSpeed * Time.deltaTime);
         }
@@ -90,12 +105,12 @@ namespace GigaGrub.Player
 
         public void SetSpeed(float newSpeed)
         {
-            currentSpeed = Mathf.Max(0f, newSpeed);
+            targetSpeed = Mathf.Max(0f, newSpeed);
         }
 
         public void ResetSpeed()
         {
-            currentSpeed = moveSpeed;
+            targetSpeed = moveSpeed;
         }
     }
 }
