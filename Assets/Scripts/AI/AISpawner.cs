@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using GigaGrub.Core;
 using GigaGrub.Player;
+using GigaGrub.Systems;
 
 namespace GigaGrub.AI
 {
@@ -105,6 +106,11 @@ namespace GigaGrub.AI
                 body.SetColor(themeColor, bodyColor);
                 body.SetIsPlayer(false);
                 body.InitializeRuntime();
+
+                if (RankingManager.Instance != null)
+                {
+                    RankingManager.Instance.RegisterCreature(body);
+                }
             }
 
             if (ai != null)
@@ -149,6 +155,12 @@ namespace GigaGrub.AI
             {
                 if (activeAICreatures[i] != null)
                 {
+                    PlayerBody body = activeAICreatures[i].CreatureBody;
+                    if (body != null && RankingManager.Instance != null)
+                    {
+                        RankingManager.Instance.UnregisterCreature(body);
+                    }
+
                     if (Application.isPlaying)
                     {
                         Destroy(activeAICreatures[i].gameObject);

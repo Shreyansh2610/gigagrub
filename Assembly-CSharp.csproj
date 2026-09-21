@@ -60,6 +60,7 @@
     <Compile Include="Assets\Scripts\Systems\GrowthSystem.cs" />
     <Compile Include="Assets\Scripts\Player\CreatureDeath.cs" />
     <Compile Include="Assets\Scripts\AI\AIWorldDetector.cs" />
+    <Compile Include="Assets\Scripts\Systems\RankingManager.cs" />
     <Compile Include="Assets\Scripts\AI\AIState.cs" />
     <Compile Include="Assets\Scripts\UI\GameOverUI.cs" />
     <Compile Include="Assets\Scripts\AI\AISpawner.cs" />

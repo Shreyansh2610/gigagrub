@@ -4,6 +4,7 @@ using GigaGrub.AI;
 using GigaGrub.Audio;
 using GigaGrub.Core;
 using GigaGrub.Food;
+using GigaGrub.Systems;
 
 namespace GigaGrub.Player
 {
@@ -110,6 +111,11 @@ namespace GigaGrub.Player
 
             // 6. Notify listeners and GameManager
             OnCreatureDied?.Invoke(this, reason);
+
+            if (RankingManager.Instance != null && creatureBody != null)
+            {
+                RankingManager.Instance.UnregisterCreature(creatureBody);
+            }
 
             if (GameManager.Instance != null)
             {

@@ -186,6 +186,11 @@ namespace GigaGrub.Player
 
             UpdateSegments();
             isInitialized = true;
+
+            if (RankingManager.Instance != null)
+            {
+                RankingManager.Instance.RegisterCreature(this);
+            }
         }
 
         public void SetIsPlayer(bool player)
@@ -637,6 +642,12 @@ namespace GigaGrub.Player
 
             // 8. Reset Score
             ResetScore();
+
+            // 9. Re-register in RankingManager
+            if (RankingManager.Instance != null)
+            {
+                RankingManager.Instance.RegisterCreature(this);
+            }
         }
 
         private void OnDestroy()

@@ -45,6 +45,7 @@ namespace GigaGrub.Core
         [SerializeField] private AISpawner aiSpawner;
         [SerializeField] private FoodSpawner foodSpawner;
         [SerializeField] private ScoreManager scoreManager;
+        [SerializeField] private RankingManager rankingManager;
         [SerializeField] private CameraFollow cameraFollow;
         [SerializeField] private GameOverUI gameOverUI;
         [SerializeField] private PauseMenuUI pauseMenuUI;
@@ -135,6 +136,11 @@ namespace GigaGrub.Core
             if (scoreManager == null)
             {
                 scoreManager = FindAnyObjectByType<ScoreManager>();
+            }
+
+            if (rankingManager == null)
+            {
+                rankingManager = FindAnyObjectByType<RankingManager>();
             }
 
             if (cameraFollow == null)
@@ -323,6 +329,11 @@ namespace GigaGrub.Core
             if (scoreUI != null && playerBody != null)
             {
                 scoreUI.BindPlayer(playerBody);
+            }
+
+            if (rankingManager != null)
+            {
+                rankingManager.ResetState();
             }
 
             // 8. Fire lifecycle events

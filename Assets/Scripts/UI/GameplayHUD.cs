@@ -16,6 +16,9 @@ namespace GigaGrub.UI
         [Tooltip("UI Text displaying the current creature length")]
         [SerializeField] private Text lengthText;
 
+        [Tooltip("UI Text displaying the current ranking position")]
+        [SerializeField] private Text rankText;
+
         [Tooltip("UI Text displaying the elapsed survival time")]
         [SerializeField] private Text timeText;
 
@@ -125,6 +128,11 @@ namespace GigaGrub.UI
                 targetGrowth.OnLengthChanged += HandleLengthChanged;
             }
 
+            if (RankingManager.Instance != null)
+            {
+                RankingManager.Instance.OnRankChanged += HandleRankChanged;
+            }
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameRestarted += HandleGameRestarted;
@@ -143,6 +151,11 @@ namespace GigaGrub.UI
                 targetGrowth.OnLengthChanged -= HandleLengthChanged;
             }
 
+            if (RankingManager.Instance != null)
+            {
+                RankingManager.Instance.OnRankChanged -= HandleRankChanged;
+            }
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameRestarted -= HandleGameRestarted;
@@ -156,6 +169,10 @@ namespace GigaGrub.UI
 
             int length = targetPlayer != null ? targetPlayer.CurrentLength : 10;
             UpdateLengthDisplay(length);
+
+            int rank = RankingManager.Instance != null ? RankingManager.Instance.CurrentRank : 1;
+            int total = RankingManager.Instance != null ? RankingManager.Instance.TotalCreatures : 1;
+            UpdateRankDisplay(rank, total);
 
             float time = GameManager.Instance != null ? GameManager.Instance.SurvivalTimer : 0f;
             UpdateTimeDisplay(time);
@@ -226,6 +243,11 @@ namespace GigaGrub.UI
             UpdateLengthDisplay(currentLength);
         }
 
+        private void HandleRankChanged(int rank, int total)
+        {
+            UpdateRankDisplay(rank, total);
+        }
+
         private void HandleGameRestarted()
         {
             lastSeconds = -1;
@@ -237,6 +259,14 @@ namespace GigaGrub.UI
             if (scoreText != null)
             {
                 scoreText.text = $"SCORE  {score:N0}";
+            }
+        }
+
+        private void UpdateRankDisplay(int rank, int total)
+        {
+            if (rankText != null)
+            {
+                rankText.text = $"RANK  #{rank} / {total}";
             }
         }
 

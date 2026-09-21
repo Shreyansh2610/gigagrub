@@ -449,12 +449,12 @@ namespace GigaGrub.Editor
             Image topBg = topHudGo.AddComponent<Image>();
             topBg.color = new Color(0.04f, 0.07f, 0.12f, 0.65f);
 
-            // Left: Score & Length Group
+            // Left: Score & Stats Group
             GameObject scoreGroupGo = new GameObject("ScoreGroup");
             scoreGroupGo.transform.SetParent(topHudGo.transform, false);
             RectTransform scoreGroupRect = scoreGroupGo.AddComponent<RectTransform>();
             scoreGroupRect.anchorMin = new Vector2(0f, 0f);
-            scoreGroupRect.anchorMax = new Vector2(0.35f, 1f);
+            scoreGroupRect.anchorMax = new Vector2(0.40f, 1f);
             scoreGroupRect.pivot = new Vector2(0f, 0.5f);
             scoreGroupRect.offsetMin = new Vector2(30f, 10f);
             scoreGroupRect.offsetMax = new Vector2(0f, -10f);
@@ -480,7 +480,7 @@ namespace GigaGrub.Editor
             lengthTextGo.transform.SetParent(scoreGroupGo.transform, false);
             RectTransform lengthTextRect = lengthTextGo.AddComponent<RectTransform>();
             lengthTextRect.anchorMin = new Vector2(0f, 0f);
-            lengthTextRect.anchorMax = new Vector2(1f, 0.45f);
+            lengthTextRect.anchorMax = new Vector2(0.48f, 0.45f);
             lengthTextRect.pivot = new Vector2(0f, 0.5f);
             lengthTextRect.offsetMin = Vector2.zero;
             lengthTextRect.offsetMax = Vector2.zero;
@@ -492,6 +492,23 @@ namespace GigaGrub.Editor
             lengthText.alignment = TextAnchor.MiddleLeft;
             lengthText.color = new Color(0.45f, 0.85f, 1f, 0.9f);
             lengthText.text = "LENGTH  10";
+
+            GameObject rankTextGo = new GameObject("RankText");
+            rankTextGo.transform.SetParent(scoreGroupGo.transform, false);
+            RectTransform rankTextRect = rankTextGo.AddComponent<RectTransform>();
+            rankTextRect.anchorMin = new Vector2(0.50f, 0f);
+            rankTextRect.anchorMax = new Vector2(1f, 0.45f);
+            rankTextRect.pivot = new Vector2(0f, 0.5f);
+            rankTextRect.offsetMin = Vector2.zero;
+            rankTextRect.offsetMax = Vector2.zero;
+
+            Text rankText = rankTextGo.AddComponent<Text>();
+            rankText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rankText.fontSize = 24;
+            rankText.fontStyle = FontStyle.Bold;
+            rankText.alignment = TextAnchor.MiddleLeft;
+            rankText.color = new Color(1f, 0.75f, 0.2f, 0.95f);
+            rankText.text = "RANK  #1 / 11";
 
             // Center: Survival Time
             GameObject timeGo = new GameObject("SurvivalTime");
@@ -618,6 +635,7 @@ namespace GigaGrub.Editor
             SerializedObject soHud = new SerializedObject(gameplayHUD);
             soHud.FindProperty("scoreText").objectReferenceValue = scoreText;
             soHud.FindProperty("lengthText").objectReferenceValue = lengthText;
+            soHud.FindProperty("rankText").objectReferenceValue = rankText;
             soHud.FindProperty("timeText").objectReferenceValue = timeText;
             soHud.FindProperty("pauseButton").objectReferenceValue = pauseBtn;
             soHud.FindProperty("boostButton").objectReferenceValue = boostBtn;
@@ -978,9 +996,12 @@ namespace GigaGrub.Editor
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // 0. ScoreManager System Object
+            // 0. ScoreManager and RankingManager System Objects
             GameObject systemGo = new GameObject("ScoreManager");
             ScoreManager scoreMgr = systemGo.AddComponent<ScoreManager>();
+
+            GameObject rankingGo = new GameObject("RankingManager");
+            RankingManager rankingMgr = rankingGo.AddComponent<RankingManager>();
 
             // 1. Camera
             GameObject camGo = new GameObject("Main Camera");
@@ -1150,11 +1171,17 @@ namespace GigaGrub.Editor
             GameplayHUD gameplayHUD = canvasInstance.GetComponentInChildren<GameplayHUD>(true);
             PauseMenuUI pauseMenuUI = canvasInstance.GetComponentInChildren<PauseMenuUI>(true);
 
+            SerializedObject soRankMgr = new SerializedObject(rankingMgr);
+            soRankMgr.FindProperty("playerBody").objectReferenceValue = playerBody;
+            soRankMgr.FindProperty("updateInterval").floatValue = 0.5f;
+            soRankMgr.ApplyModifiedPropertiesWithoutUndo();
+
             SerializedObject soGameMgr = new SerializedObject(gameManager);
             soGameMgr.FindProperty("playerBody").objectReferenceValue = playerBody;
             soGameMgr.FindProperty("aiSpawner").objectReferenceValue = aiSpawner;
             soGameMgr.FindProperty("foodSpawner").objectReferenceValue = spawner;
             soGameMgr.FindProperty("scoreManager").objectReferenceValue = scoreMgr;
+            soGameMgr.FindProperty("rankingManager").objectReferenceValue = rankingMgr;
             soGameMgr.FindProperty("cameraFollow").objectReferenceValue = camFollow;
             soGameMgr.FindProperty("gameOverUI").objectReferenceValue = gameOverUI;
             soGameMgr.FindProperty("gameplayHUD").objectReferenceValue = gameplayHUD;
@@ -1564,6 +1591,78 @@ namespace GigaGrub.Editor
             scoreMgr.AddScore(500);
             testPlayerResetDeath.Die(DeathReason.HitCreatureBody);
             Assert(scoreMgr.HighScore >= 500, $"ScoreManager HighScore tracked correctly ({scoreMgr.HighScore})");
+
+            // --- Section 10: Local Ranking System Verification ---
+            GameObject rankMgrGo = new GameObject("TestRankingManager");
+            RankingManager testRankMgr = rankMgrGo.AddComponent<RankingManager>();
+            RankingManager.SetInstanceForTest(testRankMgr);
+
+            GameObject rankPlayerGo = Object.Instantiate(playerPrefab, Vector3.zero, Quaternion.identity);
+            PlayerBody rankPlayerBody = rankPlayerGo.GetComponent<PlayerBody>();
+            rankPlayerBody.InitializeRuntime();
+            testRankMgr.RegisterCreature(rankPlayerBody);
+
+            // Spawn 3 test AI creatures
+            GameObject rankAi1 = Object.Instantiate(aiPrefab, new Vector3(5f, 5f, 0f), Quaternion.identity);
+            PlayerBody rankAi1Body = rankAi1.GetComponent<PlayerBody>();
+            rankAi1Body.SetIsPlayer(false);
+            rankAi1Body.InitializeRuntime();
+
+            GameObject rankAi2 = Object.Instantiate(aiPrefab, new Vector3(10f, 10f, 0f), Quaternion.identity);
+            PlayerBody rankAi2Body = rankAi2.GetComponent<PlayerBody>();
+            rankAi2Body.SetIsPlayer(false);
+            rankAi2Body.InitializeRuntime();
+
+            GameObject rankAi3 = Object.Instantiate(aiPrefab, new Vector3(15f, 15f, 0f), Quaternion.identity);
+            PlayerBody rankAi3Body = rankAi3.GetComponent<PlayerBody>();
+            rankAi3Body.SetIsPlayer(false);
+            rankAi3Body.InitializeRuntime();
+
+            testRankMgr.RegisterCreature(rankAi1Body);
+            testRankMgr.RegisterCreature(rankAi2Body);
+            testRankMgr.RegisterCreature(rankAi3Body);
+
+            // Total 4 creatures (Player + 3 AI), initial score 0
+            Assert(testRankMgr.TotalCreatures == 4, $"RankingManager tracks all 4 active creatures (actual: {testRankMgr.TotalCreatures})");
+            Assert(testRankMgr.CurrentRank == 1, $"Initial rank is #1 when scores are equal (actual: #{testRankMgr.CurrentRank})");
+
+            // AI 1 eats 100 points, AI 2 eats 50 points, AI 3 eats 10 points
+            rankAi1Body.OnEatFood(superFood); // +50
+            rankAi1Body.OnEatFood(superFood); // +50 = 100
+            rankAi2Body.OnEatFood(superFood); // +50
+            rankAi3Body.OnEatFood(standardFood); // +10
+
+            // Player score is 0
+            scoreMgr.ResetScore();
+            testRankMgr.RecalculateRankings();
+            Assert(testRankMgr.CurrentRank == 4, $"Player with 0 score is ranked #4 / 4 among higher AI scores (actual: #{testRankMgr.CurrentRank})");
+
+            // Player eats 60 points -> Player score 60 -> Player rank should become #2 (behind AI 1 at 100, ahead of AI 2 at 50)
+            scoreMgr.AddScore(60);
+            testRankMgr.RecalculateRankings();
+            Assert(testRankMgr.CurrentRank == 2, $"Player with 60 score is ranked #2 / 4 (actual: #{testRankMgr.CurrentRank})");
+
+            // Player eats 50 more points -> Player score 110 -> Player rank should become #1
+            scoreMgr.AddScore(50);
+            testRankMgr.RecalculateRankings();
+            Assert(testRankMgr.CurrentRank == 1, $"Player with 110 score takes top position at rank #1 / 4 (actual: #{testRankMgr.CurrentRank})");
+
+            // Kill AI 1 -> AI 1 unregisters upon death -> Total active creatures becomes 3
+            rankAi1.GetComponent<CreatureDeath>().Die(DeathReason.HitCreatureBody);
+            Assert(testRankMgr.TotalCreatures == 3, $"Total active creatures reduced to 3 after AI death (actual: {testRankMgr.TotalCreatures})");
+            Assert(testRankMgr.CurrentRank == 1, $"Player retains rank #1 / 3 after AI death");
+
+            // Leaderboard snapshot generation test
+            var leaderboard = testRankMgr.GenerateFullLeaderboard();
+            Assert(leaderboard != null && leaderboard.Count == 3, $"Leaderboard snapshot contains exactly 3 active entries (actual: {leaderboard?.Count})");
+            Assert(leaderboard[0].IsPlayer && leaderboard[0].Rank == 1, "Leaderboard top entry is Player at rank 1");
+
+            // Clean up test instances
+            Object.DestroyImmediate(rankAi1);
+            Object.DestroyImmediate(rankAi2);
+            Object.DestroyImmediate(rankAi3);
+            Object.DestroyImmediate(rankPlayerGo);
+            Object.DestroyImmediate(rankMgrGo);
 
             // Cleanup test instances
             Object.DestroyImmediate(testPlayerReset);

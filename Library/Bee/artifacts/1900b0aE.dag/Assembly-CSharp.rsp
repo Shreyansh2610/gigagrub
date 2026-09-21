@@ -513,6 +513,7 @@
 "Assets/Scripts/Player/PlayerController.cs"
 "Assets/Scripts/Player/PlayerSegment.cs"
 "Assets/Scripts/Systems/GrowthSystem.cs"
+"Assets/Scripts/Systems/RankingManager.cs"
 "Assets/Scripts/Systems/ScoreManager.cs"
 "Assets/Scripts/UI/GameOverUI.cs"
 "Assets/Scripts/UI/GameplayHUD.cs"
