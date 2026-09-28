@@ -15,9 +15,11 @@ GameObject:
   - component: {fileID: 6236207570449401110}
   - component: {fileID: 8292239746842269303}
   - component: {fileID: 1964457367884563546}
+  - component: {fileID: 5180206037183619069}
   - component: {fileID: 682057841988486025}
   - component: {fileID: 6450167078109892086}
   - component: {fileID: 5246796691836484946}
+  - component: {fileID: 1316589007149370759}
   - component: {fileID: 2637768465374679657}
   m_Layer: 0
   m_Name: AICreature
@@ -90,12 +92,12 @@ SpriteRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 98
   m_MaskInteraction: 0
-  m_Sprite: {fileID: -1554359448631966412, guid: 7086f7f9acebfb34bab5070edbc2e1e5, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 7086f7f9acebfb34bab5070edbc2e1e5, type: 3}
   m_Color: {r: 1, g: 0.4, b: 0.4, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
-  m_Size: {x: 1.28, y: 1.28}
+  m_Size: {x: 2.56, y: 2.56}
   m_AdaptiveModeThreshold: 0.5
   m_SpriteTileMode: 0
   m_WasSpriteAssigned: 1
@@ -216,6 +218,26 @@ MonoBehaviour:
   stateMachine: {fileID: 8292239746842269303}
   worldDetector: {fileID: 6236207570449401110}
   creatureBody: {fileID: 2637768465374679657}
+  boostSystem: {fileID: 5180206037183619069}
+--- !u!114 &5180206037183619069
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 48f98f2f8c68f16439be0831715a1788, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Player.BoostSystem
+  normalSpeed: 4.8
+  boostSpeed: 8.8
+  maxEnergy: 100
+  consumptionRate: 35
+  regenerationRate: 20
+  regenerationDelay: 0.5
+  minEnergyToStartBoost: 10
 --- !u!114 &682057841988486025
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -267,6 +289,27 @@ MonoBehaviour:
   ownerBody: {fileID: 2637768465374679657}
   creatureDeath: {fileID: 6450167078109892086}
   headCollider: {fileID: 2949513453319075045}
+--- !u!114 &1316589007149370759
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2977776604915646198}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7992ddb0f4c2d2346960a493c86b0da3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Cosmetics.CreatureCosmeticController
+  playerBody: {fileID: 0}
+  headBaseRenderer: {fileID: 0}
+  collarRenderer: {fileID: 0}
+  eyesRenderer: {fileID: 0}
+  mouthRenderer: {fileID: 0}
+  hatRenderer: {fileID: 0}
+  neckRenderer: {fileID: 0}
+  backRenderer: {fileID: 0}
+  effectInstance: {fileID: 0}
 --- !u!114 &2637768465374679657
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -291,6 +334,7 @@ MonoBehaviour:
   headSortingOrder: 98
   headTintColor: {r: 1, g: 1, b: 1, a: 1}
   bodyTintColor: {r: 1, g: 1, b: 1, a: 1}
+  customSegmentSprite: {fileID: 0}
   enableAudioFeedback: 0
   enableVisualPunch: 1
   headPunchScale: 1.15

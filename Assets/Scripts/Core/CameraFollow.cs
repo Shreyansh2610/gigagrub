@@ -34,6 +34,9 @@ namespace GigaGrub.Core
         [Tooltip("Enable dynamic zoom scaling as creature body grows longer")]
         [SerializeField] private bool autoScaleZoomWithLength = true;
 
+        [Tooltip("Additional camera zoom expansion when player is speed boosting")]
+        [SerializeField] private float boostZoomOffset = 1.0f;
+
         [Header("Boundary Clamping")]
         [Tooltip("Whether camera should strictly clamp within ArenaManager bounds")]
         [SerializeField] private bool clampToArena = true;
@@ -42,6 +45,7 @@ namespace GigaGrub.Core
         private float targetZoom;
         private Vector3 currentVelocity;
         private Player.PlayerBody targetBody;
+        private Player.PlayerController targetController;
 
         // Screen Shake state
         private float shakeIntensity = 0f;
@@ -75,6 +79,7 @@ namespace GigaGrub.Core
             if (target != null)
             {
                 targetBody = target.GetComponent<Player.PlayerBody>();
+                targetController = target.GetComponent<Player.PlayerController>();
             }
         }
 
@@ -108,9 +113,11 @@ namespace GigaGrub.Core
 
         private void UpdateZoom()
         {
+            float calculatedBaseZoom = defaultZoom;
+
             if (autoScaleZoomWithLength)
             {
-                if (targetBody == null && target != null)
+                if ((targetBody == null || targetController == null) && target != null)
                 {
                     ResolveTargetBody();
                 }
@@ -120,11 +127,17 @@ namespace GigaGrub.Core
                     // As length grows from 10 to 100+, scale zoom from 9.0 to ~13.5
                     int length = targetBody.CurrentLength;
                     float growthT = Mathf.Clamp01((length - 10) / 120f);
-                    targetZoom = Mathf.Lerp(defaultZoom, defaultZoom + 4.5f, growthT);
+                    calculatedBaseZoom = Mathf.Lerp(defaultZoom, defaultZoom + 4.5f, growthT);
                 }
             }
 
-            targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
+            // Dynamic camera feedback: expands FOV smoothly during speed boost
+            if (targetController != null && targetController.IsBoosting)
+            {
+                calculatedBaseZoom += boostZoomOffset;
+            }
+
+            targetZoom = Mathf.Clamp(calculatedBaseZoom, minZoom, maxZoom);
             cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetZoom, zoomSpeed * Time.deltaTime);
         }
 

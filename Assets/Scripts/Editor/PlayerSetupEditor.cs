@@ -11,6 +11,10 @@ using GigaGrub.Food;
 using GigaGrub.Audio;
 using GigaGrub.Systems;
 using GigaGrub.AI;
+using GigaGrub.PowerUps;
+using GigaGrub.Data;
+using GigaGrub.Cosmetics;
+using GigaGrub.Rewards;
 
 namespace GigaGrub.Editor
 {
@@ -21,6 +25,8 @@ namespace GigaGrub.Editor
         private const string ArtPath = "Assets/Art";
         private const string ScenesPath = "Assets/Scenes";
         private const string FoodResourcesPath = "Assets/Resources/Food";
+        private const string PowerUpResourcesPath = "Assets/Resources/PowerUps";
+        private const string SkinsResourcesPath = "Assets/Resources/Skins";
 
         static PlayerSetupEditor()
         {
@@ -37,7 +43,7 @@ namespace GigaGrub.Editor
             EditorBuildSettings.scenes = scenes;
         }
 
-        [MenuItem("GigaGrub/1. Setup All (Prefabs, Food & Game Scene)")]
+        [MenuItem("GigaGrub/1. Setup All (Prefabs, Food, PowerUps & Game Scene)")]
         public static void SetupAll()
         {
             if (EditorApplication.isPlaying)
@@ -47,19 +53,25 @@ namespace GigaGrub.Editor
                 return;
             }
 
-            Debug.Log("[GigaGrub] Starting Full Setup...");
+            Debug.Log("[GigaGrub] Starting Full Setup with Original Visual Identity...");
 
             EnsureDirectories();
+            AssetGenerator.GenerateAllArtAssets();
+            GigaGrub.Cosmetics.CosmeticDatabase cosmeticDb = CosmeticDatabaseBuilder.BuildAndSaveAllCosmetics();
+
+            CreatureSkinData[] creatureSkins = SetupCreatureSkinAssets();
             GameObject segmentPrefab = SetupPlayerSegmentPrefab();
             GameObject playerPrefab = SetupPlayerPrefab(segmentPrefab);
             GameObject aiCreaturePrefab = SetupAICreaturePrefab(segmentPrefab);
             GameObject eatingEffectPrefab = SetupEatingEffectPrefab();
+            PowerUpData[] powerUpDataAssets = SetupPowerUpDataAssets();
+            GameObject powerUpPickupPrefab = SetupPowerUpPickupPrefab();
             GameObject joystickCanvasPrefab = SetupJoystickCanvasPrefab();
             GameObject arenaPrefab = SetupArenaPrefab();
             FoodData[] foodDataAssets = SetupFoodDataAssets();
             GameObject foodPrefab = SetupFoodPrefab();
 
-            SetupGameScene(playerPrefab, joystickCanvasPrefab, arenaPrefab, foodPrefab, foodDataAssets, eatingEffectPrefab, aiCreaturePrefab);
+            SetupGameScene(playerPrefab, joystickCanvasPrefab, arenaPrefab, foodPrefab, foodDataAssets, eatingEffectPrefab, aiCreaturePrefab, powerUpPickupPrefab, powerUpDataAssets, creatureSkins);
             SetupMainMenuScene();
 
             // Register scenes in Build Settings (MainMenu = Index 0, Game = Index 1)
@@ -72,7 +84,7 @@ namespace GigaGrub.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[GigaGrub] Full Setup (MainMenu + Game Scenes) Completed Successfully!");
+            Debug.Log("[GigaGrub] Full Setup (MainMenu + Game Scenes with Modular Cosmetics System & Celestial Food) Completed Successfully!");
         }
 
         private static void EnsureDirectories()
@@ -90,6 +102,16 @@ namespace GigaGrub.Editor
             if (!AssetDatabase.IsValidFolder(FoodResourcesPath))
             {
                 AssetDatabase.CreateFolder("Assets/Resources", "Food");
+            }
+
+            if (!AssetDatabase.IsValidFolder(PowerUpResourcesPath))
+            {
+                AssetDatabase.CreateFolder("Assets/Resources", "PowerUps");
+            }
+
+            if (!AssetDatabase.IsValidFolder(SkinsResourcesPath))
+            {
+                AssetDatabase.CreateFolder("Assets/Resources", "Skins");
             }
 
             EnsureTags();
@@ -131,6 +153,23 @@ namespace GigaGrub.Editor
             Sprite sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path);
             if (sprite == null)
             {
+                string[] subPaths = new string[]
+                {
+                    $"{ArtPath}/Creatures/{fileName}",
+                    $"{ArtPath}/Food/{fileName}",
+                    $"{ArtPath}/PowerUps/{fileName}",
+                    $"{ArtPath}/Arena/{fileName}",
+                    $"{ArtPath}/UI/{fileName}"
+                };
+                foreach (string sp in subPaths)
+                {
+                    sprite = AssetDatabase.LoadAssetAtPath<Sprite>(sp);
+                    if (sprite != null) break;
+                }
+            }
+
+            if (sprite == null)
+            {
                 Object[] assets = AssetDatabase.LoadAllAssetsAtPath(path);
                 foreach (var obj in assets)
                 {
@@ -142,6 +181,53 @@ namespace GigaGrub.Editor
                 }
             }
             return sprite;
+        }
+
+        [MenuItem("GigaGrub/1.5. Setup 10 Creature Skins")]
+        public static CreatureSkinData[] SetupCreatureSkinAssets()
+        {
+            EnsureDirectories();
+            AssetGenerator.GenerateAllArtAssets();
+
+            string creaturesArt = $"{ArtPath}/Creatures";
+
+            var skinConfigs = new (string id, string name, string headFile, string segFile, Color primary, Color secondary, Color accent)[]
+            {
+                ("skin_01_player", "Giga Grub", "Head_01_Player.png", "Segment_01_Player.png", new Color(0.12f, 0.95f, 0.72f), new Color(0.04f, 0.65f, 0.45f), new Color(0.45f, 1f, 0.85f)),
+                ("skin_02_sprout", "Sprout", "Head_02_Sprout.png", "Segment_02_Sprout.png", new Color(0.48f, 0.95f, 0.12f), new Color(0.28f, 0.65f, 0.05f), new Color(0.78f, 1f, 0.45f)),
+                ("skin_03_spark", "Spark", "Head_03_Spark.png", "Segment_03_Spark.png", new Color(0.12f, 0.88f, 1f), new Color(0.02f, 0.48f, 0.75f), new Color(0.65f, 0.95f, 1f)),
+                ("skin_04_ruby", "Ruby", "Head_04_Ruby.png", "Segment_04_Ruby.png", new Color(1f, 0.22f, 0.38f), new Color(0.68f, 0.08f, 0.20f), new Color(1f, 0.65f, 0.75f)),
+                ("skin_05_sunny", "Sunny", "Head_05_Sunny.png", "Segment_05_Sunny.png", new Color(1f, 0.85f, 0.12f), new Color(0.75f, 0.50f, 0.02f), new Color(1f, 0.95f, 0.55f)),
+                ("skin_06_violet", "Violet", "Head_06_Violet.png", "Segment_06_Violet.png", new Color(0.82f, 0.22f, 0.98f), new Color(0.45f, 0.05f, 0.68f), new Color(0.95f, 0.65f, 1f)),
+                ("skin_07_bubble", "Bubble", "Head_07_Bubble.png", "Segment_07_Bubble.png", new Color(1f, 0.35f, 0.72f), new Color(0.72f, 0.12f, 0.45f), new Color(1f, 0.75f, 0.90f)),
+                ("skin_08_frost", "Frost", "Head_08_Frost.png", "Segment_08_Frost.png", new Color(0.45f, 0.85f, 1f), new Color(0.15f, 0.45f, 0.75f), new Color(0.85f, 0.95f, 1f)),
+                ("skin_09_flame", "Flame", "Head_09_Flame.png", "Segment_09_Flame.png", new Color(1f, 0.48f, 0.10f), new Color(0.72f, 0.22f, 0.02f), new Color(1f, 0.80f, 0.40f)),
+                ("skin_10_shadow", "Shadow", "Head_10_Shadow.png", "Segment_10_Shadow.png", new Color(0.48f, 0.28f, 0.98f), new Color(0.20f, 0.08f, 0.55f), new Color(0.80f, 0.65f, 1f)),
+            };
+
+            CreatureSkinData[] skins = new CreatureSkinData[skinConfigs.Length];
+
+            for (int i = 0; i < skinConfigs.Length; i++)
+            {
+                var cfg = skinConfigs[i];
+                string assetPath = $"{SkinsResourcesPath}/CreatureSkin_{i + 1:D2}_{cfg.name}.asset";
+                CreatureSkinData skin = AssetDatabase.LoadAssetAtPath<CreatureSkinData>(assetPath);
+                if (skin == null)
+                {
+                    skin = ScriptableObject.CreateInstance<CreatureSkinData>();
+                    AssetDatabase.CreateAsset(skin, assetPath);
+                }
+
+                Sprite headSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{creaturesArt}/{cfg.headFile}") ?? LoadSprite(cfg.headFile);
+                Sprite segmentSprite = AssetDatabase.LoadAssetAtPath<Sprite>($"{creaturesArt}/{cfg.segFile}") ?? LoadSprite(cfg.segFile);
+
+                skin.Configure(cfg.id, cfg.name, headSprite, segmentSprite, cfg.primary, cfg.secondary, cfg.accent);
+                EditorUtility.SetDirty(skin);
+                skins[i] = skin;
+            }
+
+            Debug.Log($"[GigaGrub] Created/Updated {skins.Length} CreatureSkinData ScriptableObjects");
+            return skins;
         }
 
         [MenuItem("GigaGrub/2. Setup Arena Prefab")]
@@ -187,6 +273,7 @@ namespace GigaGrub.Editor
             col.radius = 0.5f;
 
             PlayerSegment segment = go.AddComponent<PlayerSegment>();
+            SegmentCosmeticRenderer cosRenderer = go.AddComponent<SegmentCosmeticRenderer>();
 
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
             Object.DestroyImmediate(go);
@@ -233,9 +320,31 @@ namespace GigaGrub.Editor
             audioSrc.spatialBlend = 0f;
 
             PlayerController controller = go.AddComponent<PlayerController>();
+            BoostSystem boost = go.AddComponent<BoostSystem>();
+            BoostVisualEffect boostFx = go.AddComponent<BoostVisualEffect>();
+            PowerUpManager powerUps = go.AddComponent<PowerUpManager>();
             GrowthSystem growth = go.AddComponent<GrowthSystem>();
             CreatureDeath death = go.AddComponent<CreatureDeath>();
             CreatureCollision collision = go.AddComponent<CreatureCollision>();
+            CreatureCosmeticController cosmetics = go.AddComponent<CreatureCosmeticController>();
+
+            SerializedObject soBoost = new SerializedObject(boost);
+            soBoost.FindProperty("normalSpeed").floatValue = 5.0f;
+            soBoost.FindProperty("boostSpeed").floatValue = 9.5f;
+            soBoost.FindProperty("maxEnergy").floatValue = 100.0f;
+            soBoost.FindProperty("consumptionRate").floatValue = 35.0f;
+            soBoost.FindProperty("regenerationRate").floatValue = 22.0f;
+            soBoost.FindProperty("regenerationDelay").floatValue = 0.4f;
+            soBoost.FindProperty("minEnergyToStartBoost").floatValue = 5.0f;
+            soBoost.ApplyModifiedPropertiesWithoutUndo();
+
+            SerializedObject soCtrl = new SerializedObject(controller);
+            soCtrl.FindProperty("moveSpeed").floatValue = 5.0f;
+            soCtrl.FindProperty("turnSpeed").floatValue = 360f;
+            soCtrl.FindProperty("turnDamping").floatValue = 16f;
+            soCtrl.FindProperty("boostSystem").objectReferenceValue = boost;
+            soCtrl.FindProperty("powerUpManager").objectReferenceValue = powerUps;
+            soCtrl.ApplyModifiedPropertiesWithoutUndo();
 
             PlayerBody body = go.AddComponent<PlayerBody>();
             SerializedObject soBody = new SerializedObject(body);
@@ -334,9 +443,21 @@ namespace GigaGrub.Editor
             stateMachine.BindDetector(detector);
 
             AIController aiCtrl = go.AddComponent<AIController>();
+            BoostSystem aiBoost = go.AddComponent<BoostSystem>();
             GrowthSystem growth = go.AddComponent<GrowthSystem>();
             CreatureDeath death = go.AddComponent<CreatureDeath>();
             CreatureCollision collision = go.AddComponent<CreatureCollision>();
+            CreatureCosmeticController cosmetics = go.AddComponent<CreatureCosmeticController>();
+
+            SerializedObject soAiBoost = new SerializedObject(aiBoost);
+            soAiBoost.FindProperty("normalSpeed").floatValue = 4.8f;
+            soAiBoost.FindProperty("boostSpeed").floatValue = 8.8f;
+            soAiBoost.FindProperty("maxEnergy").floatValue = 100.0f;
+            soAiBoost.FindProperty("consumptionRate").floatValue = 35.0f;
+            soAiBoost.FindProperty("regenerationRate").floatValue = 20.0f;
+            soAiBoost.FindProperty("regenerationDelay").floatValue = 0.5f;
+            soAiBoost.FindProperty("minEnergyToStartBoost").floatValue = 10.0f;
+            soAiBoost.ApplyModifiedPropertiesWithoutUndo();
 
             PlayerBody body = go.AddComponent<PlayerBody>();
             SerializedObject soBody = new SerializedObject(body);
@@ -373,6 +494,7 @@ namespace GigaGrub.Editor
             soAi.FindProperty("stateMachine").objectReferenceValue = stateMachine;
             soAi.FindProperty("worldDetector").objectReferenceValue = detector;
             soAi.FindProperty("creatureBody").objectReferenceValue = body;
+            soAi.FindProperty("boostSystem").objectReferenceValue = aiBoost;
             soAi.ApplyModifiedPropertiesWithoutUndo();
 
             SerializedObject soDeath = new SerializedObject(death);
@@ -630,7 +752,7 @@ namespace GigaGrub.Editor
             soVj.FindProperty("deadZone").floatValue = 0.05f;
             soVj.ApplyModifiedPropertiesWithoutUndo();
 
-            // Right: Boost Button Placeholder
+            // Right: Boost Button (Touch Hold Component)
             GameObject boostBtnGo = new GameObject("BoostButton");
             boostBtnGo.transform.SetParent(safeAreaGo.transform, false);
 
@@ -645,6 +767,7 @@ namespace GigaGrub.Editor
             boostImg.color = new Color(0.95f, 0.35f, 0.25f, 0.85f);
 
             Button boostBtn = boostBtnGo.AddComponent<Button>();
+            HoldButton holdBtn = boostBtnGo.AddComponent<HoldButton>();
 
             GameObject boostTxtGo = new GameObject("Text");
             boostTxtGo.transform.SetParent(boostBtnGo.transform, false);
@@ -662,6 +785,75 @@ namespace GigaGrub.Editor
             boostTxt.color = Color.white;
             boostTxt.text = "BOOST";
 
+            // Boost Energy Bar Container (Positioned directly above Boost Button)
+            GameObject energyBarGo = new GameObject("BoostEnergyBar");
+            energyBarGo.transform.SetParent(safeAreaGo.transform, false);
+
+            RectTransform energyBarRect = energyBarGo.AddComponent<RectTransform>();
+            energyBarRect.anchorMin = new Vector2(1f, 0f);
+            energyBarRect.anchorMax = new Vector2(1f, 0f);
+            energyBarRect.pivot = new Vector2(0.5f, 0.5f);
+            energyBarRect.anchoredPosition = new Vector2(-200f, 295f);
+            energyBarRect.sizeDelta = new Vector2(160f, 20f);
+
+            Image energyBarBg = energyBarGo.AddComponent<Image>();
+            energyBarBg.color = new Color(0.06f, 0.10f, 0.17f, 0.90f); // Dark Slate #0F172A
+
+            GameObject fillGo = new GameObject("Fill");
+            fillGo.transform.SetParent(energyBarGo.transform, false);
+            RectTransform fillRect = fillGo.AddComponent<RectTransform>();
+            fillRect.anchorMin = Vector2.zero;
+            fillRect.anchorMax = Vector2.one;
+            fillRect.offsetMin = new Vector2(2f, 2f);
+            fillRect.offsetMax = new Vector2(-2f, -2f);
+
+            Image fillImg = fillGo.AddComponent<Image>();
+            fillImg.type = Image.Type.Filled;
+            fillImg.fillMethod = Image.FillMethod.Horizontal;
+            fillImg.color = new Color(0.22f, 0.74f, 0.97f, 1f); // Neon Cyan #38BDF8
+
+            GameObject energyTxtGo = new GameObject("EnergyText");
+            energyTxtGo.transform.SetParent(energyBarGo.transform, false);
+            RectTransform energyTxtRect = energyTxtGo.AddComponent<RectTransform>();
+            energyTxtRect.anchorMin = Vector2.zero;
+            energyTxtRect.anchorMax = Vector2.one;
+            energyTxtRect.offsetMin = Vector2.zero;
+            energyTxtRect.offsetMax = Vector2.zero;
+
+            Text energyTxt = energyTxtGo.AddComponent<Text>();
+            energyTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            energyTxt.fontSize = 12;
+            energyTxt.fontStyle = FontStyle.Bold;
+            energyTxt.alignment = TextAnchor.MiddleCenter;
+            energyTxt.color = Color.white;
+            energyTxt.text = "100%";
+
+            BoostEnergyBarUI energyBarUI = energyBarGo.AddComponent<BoostEnergyBarUI>();
+            SerializedObject soEnergy = new SerializedObject(energyBarUI);
+            soEnergy.FindProperty("fillImage").objectReferenceValue = fillImg;
+            soEnergy.FindProperty("backgroundImage").objectReferenceValue = energyBarBg;
+            soEnergy.FindProperty("energyText").objectReferenceValue = energyTxt;
+            soEnergy.ApplyModifiedPropertiesWithoutUndo();
+
+            // Active Power-Ups Badge HUD Container (Positioned on the Left Middle of Screen)
+            GameObject powerUpHudGo = new GameObject("ActivePowerUpHUD");
+            powerUpHudGo.transform.SetParent(safeAreaGo.transform, false);
+
+            RectTransform pUpRect = powerUpHudGo.AddComponent<RectTransform>();
+            pUpRect.anchorMin = new Vector2(0f, 0.45f);
+            pUpRect.anchorMax = new Vector2(0f, 0.45f);
+            pUpRect.pivot = new Vector2(0f, 0.5f);
+            pUpRect.anchoredPosition = new Vector2(40f, 0f);
+            pUpRect.sizeDelta = new Vector2(220f, 320f);
+
+            VerticalLayoutGroup pUpLayout = powerUpHudGo.AddComponent<VerticalLayoutGroup>();
+            pUpLayout.childAlignment = TextAnchor.MiddleLeft;
+            pUpLayout.childControlHeight = false;
+            pUpLayout.childControlWidth = false;
+            pUpLayout.spacing = 10f;
+
+            ActivePowerUpHUD powerUpHUD = powerUpHudGo.AddComponent<ActivePowerUpHUD>();
+
             // Wire GameplayHUD component
             GameplayHUD gameplayHUD = topHudGo.AddComponent<GameplayHUD>();
             SerializedObject soHud = new SerializedObject(gameplayHUD);
@@ -671,6 +863,9 @@ namespace GigaGrub.Editor
             soHud.FindProperty("timeText").objectReferenceValue = timeText;
             soHud.FindProperty("pauseButton").objectReferenceValue = pauseBtn;
             soHud.FindProperty("boostButton").objectReferenceValue = boostBtn;
+            soHud.FindProperty("holdBoostButton").objectReferenceValue = holdBtn;
+            soHud.FindProperty("boostEnergyBar").objectReferenceValue = energyBarUI;
+            soHud.FindProperty("activePowerUpHUD").objectReferenceValue = powerUpHUD;
             soHud.ApplyModifiedPropertiesWithoutUndo();
 
             // Backwards compatibility ScoreUI component
@@ -914,9 +1109,11 @@ namespace GigaGrub.Editor
         {
             EnsureDirectories();
 
-            Sprite sprite = LoadSprite("SegmentSprite.png");
+            Sprite starBerry = LoadSprite("Food_StarBerry.png") ?? LoadSprite("SegmentSprite.png");
+            Sprite jellyDrop = LoadSprite("Food_JellyDrop.png") ?? LoadSprite("SegmentSprite.png");
+            Sprite astralCore = LoadSprite("Food_AstralCore.png") ?? LoadSprite("SegmentSprite.png");
 
-            // 1. Standard Grub (Score: 10, Growth: 1, Weight: 70, Emerald Lime)
+            // 1. Standard Grub (Score: 10, Growth: 1, Weight: 70, Emerald Star Berry)
             FoodData standard = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Standard.asset");
             if (standard == null)
             {
@@ -925,20 +1122,20 @@ namespace GigaGrub.Editor
             }
             standard.Configure(
                 FoodType.Standard,
-                "Standard Grub",
+                "Star Berry",
                 score: 10,
                 growth: 1,
                 weight: 70f,
                 color: new Color(0.18f, 0.95f, 0.35f, 1f),
                 scale: 0.9f,
-                sprite: sprite,
+                sprite: starBerry,
                 pulse: true,
                 pSpeed: 3f,
                 pMag: 0.08f
             );
             EditorUtility.SetDirty(standard);
 
-            // 2. Super Grub (Score: 30, Growth: 3, Weight: 20, Amber Gold)
+            // 2. Super Grub (Score: 30, Growth: 3, Weight: 20, Amber Jelly Drop)
             FoodData superFood = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Super.asset");
             if (superFood == null)
             {
@@ -947,20 +1144,20 @@ namespace GigaGrub.Editor
             }
             superFood.Configure(
                 FoodType.Super,
-                "Super Grub",
+                "Jelly Drop",
                 score: 30,
                 growth: 3,
                 weight: 20f,
                 color: new Color(1f, 0.78f, 0.1f, 1f),
                 scale: 1.2f,
-                sprite: sprite,
+                sprite: jellyDrop,
                 pulse: true,
                 pSpeed: 4.5f,
                 pMag: 0.14f
             );
             EditorUtility.SetDirty(superFood);
 
-            // 3. Mega Grub (Score: 100, Growth: 5, Weight: 10, Electric Magenta)
+            // 3. Mega Grub (Score: 100, Growth: 5, Weight: 10, Astral Core)
             FoodData megaFood = AssetDatabase.LoadAssetAtPath<FoodData>($"{FoodResourcesPath}/FoodData_Mega.asset");
             if (megaFood == null)
             {
@@ -969,20 +1166,20 @@ namespace GigaGrub.Editor
             }
             megaFood.Configure(
                 FoodType.Mega,
-                "Mega Grub",
+                "Astral Core",
                 score: 100,
                 growth: 5,
                 weight: 10f,
                 color: new Color(0.92f, 0.2f, 0.98f, 1f),
                 scale: 1.55f,
-                sprite: sprite,
+                sprite: astralCore,
                 pulse: true,
                 pSpeed: 6f,
                 pMag: 0.2f
             );
             EditorUtility.SetDirty(megaFood);
 
-            Debug.Log("[GigaGrub] Created/Updated 3 FoodData ScriptableObjects");
+            Debug.Log("[GigaGrub] Created/Updated 3 Celestial FoodData ScriptableObjects");
             return new FoodData[] { standard, superFood, megaFood };
         }
 
@@ -992,9 +1189,9 @@ namespace GigaGrub.Editor
             GameObject go = new GameObject("Food");
 
             SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-            sr.sprite = LoadSprite("SegmentSprite.png");
+            sr.sprite = LoadSprite("Food_StarBerry.png") ?? LoadSprite("SegmentSprite.png");
             sr.sortingOrder = 40;
-            sr.color = new Color(0.2f, 0.95f, 0.35f, 1f);
+            sr.color = Color.white;
 
             CircleCollider2D col = go.AddComponent<CircleCollider2D>();
             col.isTrigger = true;
@@ -1009,10 +1206,121 @@ namespace GigaGrub.Editor
             return prefab;
         }
 
+        [MenuItem("GigaGrub/7.5. Setup Power-Up Data & Prefabs")]
+        public static void MenuSetupPowerUpSystem()
+        {
+            EnsureDirectories();
+            SetupPowerUpDataAssets();
+            SetupPowerUpPickupPrefab();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
+        public static PowerUpData[] SetupPowerUpDataAssets()
+        {
+            EnsureDirectories();
+
+            Sprite speedSprite = LoadSprite("PowerUp_SpeedSurge.png") ?? LoadSprite("SegmentSprite.png");
+            Sprite magnetSprite = LoadSprite("PowerUp_FoodMagnet.png") ?? LoadSprite("SegmentSprite.png");
+            Sprite multSprite = LoadSprite("PowerUp_2xScore.png") ?? LoadSprite("SegmentSprite.png");
+
+            // 1. Speed Boost (Duration: 8s, Bonus: 3.5 u/s, Weight: 35, Electric Cyan)
+            PowerUpData speedBoost = AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_SpeedBoost.asset");
+            if (speedBoost == null)
+            {
+                speedBoost = ScriptableObject.CreateInstance<PowerUpData>();
+                AssetDatabase.CreateAsset(speedBoost, $"{PowerUpResourcesPath}/PowerUp_SpeedBoost.asset");
+            }
+            speedBoost.Configure(
+                id: "speed_boost",
+                name: "Speed Surge",
+                type: PowerUpType.SpeedBoost,
+                duration: 8.0f,
+                effectStrength: 3.5f,
+                spawnWeight: 35.0f,
+                themeColor: new Color(0.15f, 0.85f, 1f, 1f),
+                icon: speedSprite,
+                pulse: true,
+                pulseSpeed: 5f,
+                pulseMagnitude: 0.15f
+            );
+            EditorUtility.SetDirty(speedBoost);
+
+            // 2. Food Magnet (Duration: 10s, Radius: 6 u, Weight: 35, Neon Magenta)
+            PowerUpData foodMagnet = AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_FoodMagnet.asset");
+            if (foodMagnet == null)
+            {
+                foodMagnet = ScriptableObject.CreateInstance<PowerUpData>();
+                AssetDatabase.CreateAsset(foodMagnet, $"{PowerUpResourcesPath}/PowerUp_FoodMagnet.asset");
+            }
+            foodMagnet.Configure(
+                id: "food_magnet",
+                name: "Food Magnet",
+                type: PowerUpType.FoodMagnet,
+                duration: 10.0f,
+                effectStrength: 6.0f,
+                spawnWeight: 35.0f,
+                themeColor: new Color(0.95f, 0.2f, 0.85f, 1f),
+                icon: magnetSprite,
+                pulse: true,
+                pulseSpeed: 4.5f,
+                pulseMagnitude: 0.18f
+            );
+            EditorUtility.SetDirty(foodMagnet);
+
+            // 3. Score Multiplier (Duration: 12s, Multiplier: 2.0x, Weight: 30, Radiant Gold)
+            PowerUpData scoreMultiplier = AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_ScoreMultiplier.asset");
+            if (scoreMultiplier == null)
+            {
+                scoreMultiplier = ScriptableObject.CreateInstance<PowerUpData>();
+                AssetDatabase.CreateAsset(scoreMultiplier, $"{PowerUpResourcesPath}/PowerUp_ScoreMultiplier.asset");
+            }
+            scoreMultiplier.Configure(
+                id: "score_multiplier",
+                name: "2x Score",
+                type: PowerUpType.ScoreMultiplier,
+                duration: 12.0f,
+                effectStrength: 2.0f,
+                spawnWeight: 30.0f,
+                themeColor: new Color(1f, 0.85f, 0.15f, 1f),
+                icon: multSprite,
+                pulse: true,
+                pulseSpeed: 4.0f,
+                pulseMagnitude: 0.12f
+            );
+            EditorUtility.SetDirty(scoreMultiplier);
+
+            Debug.Log("[GigaGrub] Created/Updated 3 PowerUpData ScriptableObjects");
+            return new PowerUpData[] { speedBoost, foodMagnet, scoreMultiplier };
+        }
+
+        public static GameObject SetupPowerUpPickupPrefab()
+        {
+            string prefabPath = $"{PrefabsPath}/PowerUpPickup.prefab";
+            GameObject go = new GameObject("PowerUpPickup");
+
+            SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = LoadSprite("PowerUp_SpeedSurge.png") ?? LoadSprite("SegmentSprite.png");
+            sr.sortingOrder = 45;
+            sr.color = Color.white;
+
+            CircleCollider2D col = go.AddComponent<CircleCollider2D>();
+            col.isTrigger = true;
+            col.radius = 0.55f;
+
+            PowerUpPickup pickup = go.AddComponent<PowerUpPickup>();
+
+            GameObject prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            Object.DestroyImmediate(go);
+
+            Debug.Log($"[GigaGrub] Created/Updated {prefabPath}");
+            return prefab;
+        }
+
         [MenuItem("GigaGrub/8. Setup Game Scene")]
         public static void MenuSetupGameScene()
         {
-            SetupGameScene(null, null, null, null, null, null, null);
+            SetupGameScene(null, null, null, null, null, null, null, null, null, null);
         }
 
         public static void SetupGameScene(
@@ -1022,18 +1330,33 @@ namespace GigaGrub.Editor
             GameObject foodPrefab = null,
             FoodData[] foodDataAssets = null,
             GameObject eatingEffectPrefab = null,
-            GameObject aiCreaturePrefab = null)
+            GameObject aiCreaturePrefab = null,
+            GameObject powerUpPickupPrefab = null,
+            PowerUpData[] powerUpDataAssets = null,
+            CreatureSkinData[] creatureSkinAssets = null)
         {
             string scenePath = $"{ScenesPath}/Game.unity";
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // 0. ScoreManager and RankingManager System Objects
+            // 0. System Objects (ScoreManager, RankingManager, SaveManager, CosmeticManager)
             GameObject systemGo = new GameObject("ScoreManager");
             ScoreManager scoreMgr = systemGo.AddComponent<ScoreManager>();
 
             GameObject rankingGo = new GameObject("RankingManager");
             RankingManager rankingMgr = rankingGo.AddComponent<RankingManager>();
+
+            GameObject saveMgrGo = new GameObject("SaveManager");
+            SaveManager saveMgr = saveMgrGo.AddComponent<SaveManager>();
+
+            GameObject cosmeticMgrGo = new GameObject("CosmeticManager");
+            GigaGrub.Cosmetics.CosmeticManager cosmeticMgr = cosmeticMgrGo.AddComponent<GigaGrub.Cosmetics.CosmeticManager>();
+
+            GameObject dailyRewardGo = new GameObject("DailyRewardManager");
+            dailyRewardGo.AddComponent<DailyRewardManager>();
+
+            GameObject questMgrGo = new GameObject("QuestManager");
+            questMgrGo.AddComponent<QuestManager>();
 
             // 1. Camera
             GameObject camGo = new GameObject("Main Camera");
@@ -1043,7 +1366,7 @@ namespace GigaGrub.Editor
             Camera cam = camGo.AddComponent<Camera>();
             cam.orthographic = true;
             cam.orthographicSize = 9f;
-            cam.backgroundColor = new Color(0.06f, 0.08f, 0.12f, 1f);
+            cam.backgroundColor = new Color(0.04f, 0.07f, 0.12f, 1f);
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<AudioListener>();
 
@@ -1087,6 +1410,17 @@ namespace GigaGrub.Editor
             PlayerBody playerBody = playerInstance.GetComponent<PlayerBody>();
             PlayerController playerCtrl = playerInstance.GetComponent<PlayerController>();
             GrowthSystem growthSystem = playerInstance.GetComponent<GrowthSystem>();
+
+            if (creatureSkinAssets == null || creatureSkinAssets.Length == 0)
+            {
+                creatureSkinAssets = SetupCreatureSkinAssets();
+            }
+
+            if (playerBody != null && creatureSkinAssets.Length > 0)
+            {
+                playerBody.SetSkin(creatureSkinAssets[0]);
+                EditorUtility.SetDirty(playerBody);
+            }
 
             // 4. Joystick & Score HUD Canvas
             if (joystickCanvasPrefab == null)
@@ -1152,13 +1486,13 @@ namespace GigaGrub.Editor
             FoodSpawner spawner = spawnerGo.AddComponent<FoodSpawner>();
             spawner.SetFoodPrefab(foodPrefab);
             spawner.SetFoodTypes(foodDataAssets);
-            spawner.SetDefaultSprite(LoadSprite("SegmentSprite.png"));
+            spawner.SetDefaultSprite(LoadSprite("Food_StarBerry.png") ?? LoadSprite("SegmentSprite.png"));
             spawner.SetPopulationLimits(100, 150, 120);
             spawner.SetPlayerBody(playerBody);
 
             SerializedObject soSpawner = new SerializedObject(spawner);
             soSpawner.FindProperty("foodPrefab").objectReferenceValue = foodPrefab;
-            soSpawner.FindProperty("defaultFoodSprite").objectReferenceValue = LoadSprite("SegmentSprite.png");
+            soSpawner.FindProperty("defaultFoodSprite").objectReferenceValue = LoadSprite("Food_StarBerry.png") ?? LoadSprite("SegmentSprite.png");
             soSpawner.FindProperty("minFoodCount").intValue = 100;
             soSpawner.FindProperty("maxFoodCount").intValue = 150;
             soSpawner.FindProperty("initialFoodCount").intValue = 120;
@@ -1175,7 +1509,7 @@ namespace GigaGrub.Editor
             }
             soSpawner.ApplyModifiedPropertiesWithoutUndo();
 
-            // 6. AI Spawner (10 AI Creatures)
+            // 6. AI Spawner (10 AI Creatures with 9 Bot Skins)
             if (aiCreaturePrefab == null)
             {
                 aiCreaturePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/AICreature.prefab");
@@ -1190,16 +1524,71 @@ namespace GigaGrub.Editor
             aiSpawner.SetAIPrefab(aiCreaturePrefab);
             aiSpawner.SetTargetAICount(10);
 
+            CreatureSkinData[] botSkins = new CreatureSkinData[Mathf.Max(1, creatureSkinAssets.Length - 1)];
+            for (int i = 1; i < creatureSkinAssets.Length; i++)
+            {
+                botSkins[i - 1] = creatureSkinAssets[i];
+            }
+            aiSpawner.SetSkins(botSkins);
+
             SerializedObject soAiSpawner = new SerializedObject(aiSpawner);
             soAiSpawner.FindProperty("aiCreaturePrefab").objectReferenceValue = aiCreaturePrefab;
             soAiSpawner.FindProperty("targetAICount").intValue = 10;
             soAiSpawner.FindProperty("minSpawnDistance").floatValue = 12f;
+
+            SerializedProperty botSkinsProp = soAiSpawner.FindProperty("botSkins");
+            botSkinsProp.arraySize = botSkins.Length;
+            for (int i = 0; i < botSkins.Length; i++)
+            {
+                botSkinsProp.GetArrayElementAtIndex(i).objectReferenceValue = botSkins[i];
+            }
             soAiSpawner.ApplyModifiedPropertiesWithoutUndo();
 
-            // 7. SaveManager & GameManager
-            GameObject saveManagerGo = new GameObject("SaveManager");
-            SaveManager saveManager = saveManagerGo.AddComponent<SaveManager>();
+            // 6.5. PowerUp Spawner (5 Concurrent Pickups)
+            if (powerUpPickupPrefab == null)
+            {
+                powerUpPickupPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabsPath}/PowerUpPickup.prefab");
+                if (powerUpPickupPrefab == null)
+                {
+                    powerUpPickupPrefab = SetupPowerUpPickupPrefab();
+                }
+            }
 
+            if (powerUpDataAssets == null || powerUpDataAssets.Length == 0)
+            {
+                powerUpDataAssets = new PowerUpData[]
+                {
+                    AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_SpeedBoost.asset"),
+                    AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_FoodMagnet.asset"),
+                    AssetDatabase.LoadAssetAtPath<PowerUpData>($"{PowerUpResourcesPath}/PowerUp_ScoreMultiplier.asset")
+                };
+
+                if (powerUpDataAssets[0] == null)
+                {
+                    powerUpDataAssets = SetupPowerUpDataAssets();
+                }
+            }
+
+            GameObject powerUpSpawnerGo = new GameObject("PowerUpSpawner");
+            PowerUpSpawner powerUpSpawner = powerUpSpawnerGo.AddComponent<PowerUpSpawner>();
+            powerUpSpawner.SetPickupPrefab(powerUpPickupPrefab);
+            powerUpSpawner.SetPowerUpTypes(powerUpDataAssets);
+            powerUpSpawner.SetPoolParameters(5, 10f, 20f);
+
+            SerializedObject soPowerUpSpawner = new SerializedObject(powerUpSpawner);
+            soPowerUpSpawner.FindProperty("pickupPrefab").objectReferenceValue = powerUpPickupPrefab;
+            soPowerUpSpawner.FindProperty("maxActivePickups").intValue = 5;
+            soPowerUpSpawner.FindProperty("spawnInterval").floatValue = 15f;
+            soPowerUpSpawner.FindProperty("wallMargin").floatValue = 4f;
+            SerializedProperty puTypesProp = soPowerUpSpawner.FindProperty("powerUpTypes");
+            puTypesProp.arraySize = powerUpDataAssets.Length;
+            for (int i = 0; i < powerUpDataAssets.Length; i++)
+            {
+                puTypesProp.GetArrayElementAtIndex(i).objectReferenceValue = powerUpDataAssets[i];
+            }
+            soPowerUpSpawner.ApplyModifiedPropertiesWithoutUndo();
+
+            // 7. GameManager & UI Wiring
             GameObject gameManagerGo = new GameObject("GameManager");
             GameManager gameManager = gameManagerGo.AddComponent<GameManager>();
             GameOverUI gameOverUI = canvasInstance.GetComponentInChildren<GameOverUI>(true);
@@ -1217,7 +1606,7 @@ namespace GigaGrub.Editor
             soGameMgr.FindProperty("foodSpawner").objectReferenceValue = spawner;
             soGameMgr.FindProperty("scoreManager").objectReferenceValue = scoreMgr;
             soGameMgr.FindProperty("rankingManager").objectReferenceValue = rankingMgr;
-            soGameMgr.FindProperty("saveManager").objectReferenceValue = saveManager;
+            soGameMgr.FindProperty("saveManager").objectReferenceValue = saveMgr;
             soGameMgr.FindProperty("cameraFollow").objectReferenceValue = camFollow;
             soGameMgr.FindProperty("gameOverUI").objectReferenceValue = gameOverUI;
             soGameMgr.FindProperty("gameplayHUD").objectReferenceValue = gameplayHUD;
@@ -1268,12 +1657,15 @@ namespace GigaGrub.Editor
             cam.clearFlags = CameraClearFlags.SolidColor;
             camGo.AddComponent<AudioListener>();
 
-            // 2. SaveManager & SceneTransitionManager
+            // 2. SaveManager, SceneTransitionManager & CosmeticManager
             GameObject saveMgrGo = new GameObject("SaveManager");
             saveMgrGo.AddComponent<SaveManager>();
 
             GameObject transMgrGo = new GameObject("SceneTransitionManager");
             transMgrGo.AddComponent<SceneTransitionManager>();
+
+            GameObject cosmeticMgrGo = new GameObject("CosmeticManager");
+            cosmeticMgrGo.AddComponent<GigaGrub.Cosmetics.CosmeticManager>();
 
             // 3. Main Menu Canvas (1920x1080 Landscape Scaler)
             GameObject canvasGo = new GameObject("MainMenuCanvas");
@@ -1324,8 +1716,8 @@ namespace GigaGrub.Editor
             GameObject titleTxtGo = new GameObject("TitleText");
             titleTxtGo.transform.SetParent(logoGo.transform, false);
             RectTransform titleRect = titleTxtGo.AddComponent<RectTransform>();
-            titleRect.anchorMin = new Vector2(0f, 0.35f);
-            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.anchorMin = Vector2.zero;
+            titleRect.anchorMax = Vector2.one;
             titleRect.offsetMin = Vector2.zero;
             titleRect.offsetMax = Vector2.zero;
 
@@ -1341,21 +1733,19 @@ namespace GigaGrub.Editor
             titleShadow.effectColor = new Color(0.02f, 0.25f, 0.12f, 0.85f);
             titleShadow.effectDistance = new Vector2(3f, -3f);
 
-            GameObject subTxtGo = new GameObject("SubtitleText");
-            subTxtGo.transform.SetParent(logoGo.transform, false);
-            RectTransform subRect = subTxtGo.AddComponent<RectTransform>();
-            subRect.anchorMin = new Vector2(0f, 0f);
-            subRect.anchorMax = new Vector2(1f, 0.35f);
-            subRect.offsetMin = Vector2.zero;
-            subRect.offsetMax = Vector2.zero;
+            // ==========================================
+            // LIVE CREATURE PREVIEW (MAIN MENU)
+            // ==========================================
+            GameObject previewGo = new GameObject("MainMenuCreaturePreview", typeof(RectTransform));
+            previewGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform previewRect = previewGo.GetComponent<RectTransform>();
+            previewRect.anchorMin = new Vector2(0.5f, 0.58f);
+            previewRect.anchorMax = new Vector2(0.5f, 0.58f);
+            previewRect.pivot = new Vector2(0.5f, 0.5f);
+            previewRect.anchoredPosition = Vector2.zero;
+            previewRect.sizeDelta = new Vector2(160f, 160f);
 
-            Text subTxt = subTxtGo.AddComponent<Text>();
-            subTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            subTxt.fontSize = 24;
-            subTxt.fontStyle = FontStyle.Bold;
-            subTxt.alignment = TextAnchor.MiddleCenter;
-            subTxt.color = new Color(0.22f, 0.74f, 0.97f, 1f); // Sky Cyan #38BDF8
-            subTxt.text = "NEON SLITHER ARENA";
+            GigaGrub.Cosmetics.CreaturePreviewStage mainPreviewStage = previewGo.AddComponent<GigaGrub.Cosmetics.CreaturePreviewStage>();
 
             // ==========================================
             // BEST SCORE BADGE
@@ -1363,11 +1753,11 @@ namespace GigaGrub.Editor
             GameObject bestBadgeGo = new GameObject("BestScoreBadge");
             bestBadgeGo.transform.SetParent(safeAreaGo.transform, false);
             RectTransform bestRect = bestBadgeGo.AddComponent<RectTransform>();
-            bestRect.anchorMin = new Vector2(0.5f, 0.58f);
-            bestRect.anchorMax = new Vector2(0.5f, 0.58f);
+            bestRect.anchorMin = new Vector2(0.5f, 0.70f);
+            bestRect.anchorMax = new Vector2(0.5f, 0.70f);
             bestRect.pivot = new Vector2(0.5f, 0.5f);
             bestRect.anchoredPosition = Vector2.zero;
-            bestRect.sizeDelta = new Vector2(380f, 54f);
+            bestRect.sizeDelta = new Vector2(380f, 50f);
 
             Image bestImg = bestBadgeGo.AddComponent<Image>();
             bestImg.color = new Color(0.06f, 0.09f, 0.15f, 0.85f);
@@ -1394,11 +1784,11 @@ namespace GigaGrub.Editor
             GameObject playBtnGo = new GameObject("PlayButton");
             playBtnGo.transform.SetParent(safeAreaGo.transform, false);
             RectTransform playRect = playBtnGo.AddComponent<RectTransform>();
-            playRect.anchorMin = new Vector2(0.5f, 0.43f);
-            playRect.anchorMax = new Vector2(0.5f, 0.43f);
+            playRect.anchorMin = new Vector2(0.5f, 0.38f);
+            playRect.anchorMax = new Vector2(0.5f, 0.38f);
             playRect.pivot = new Vector2(0.5f, 0.5f);
             playRect.anchoredPosition = Vector2.zero;
-            playRect.sizeDelta = new Vector2(400f, 96f);
+            playRect.sizeDelta = new Vector2(380f, 88f);
 
             Image playImg = playBtnGo.AddComponent<Image>();
             playImg.color = new Color(0.06f, 0.73f, 0.51f, 1f); // Vibrant Emerald #10B981
@@ -1415,23 +1805,113 @@ namespace GigaGrub.Editor
 
             Text playTxt = playTxtGo.AddComponent<Text>();
             playTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            playTxt.fontSize = 46;
+            playTxt.fontSize = 44;
             playTxt.fontStyle = FontStyle.Bold;
             playTxt.alignment = TextAnchor.MiddleCenter;
             playTxt.color = Color.white;
             playTxt.text = "PLAY";
 
             // ==========================================
-            // NAVIGATION BUTTONS (STATISTICS & SETTINGS)
+            // NAVIGATION BUTTONS (CUSTOMIZE, REWARDS, STATISTICS & SETTINGS)
             // ==========================================
+            // 1. Customize Button
+            GameObject custBtnGo = new GameObject("CustomizeButton");
+            custBtnGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform custBtnRect = custBtnGo.AddComponent<RectTransform>();
+            custBtnRect.anchorMin = new Vector2(0.5f, 0.22f);
+            custBtnRect.anchorMax = new Vector2(0.5f, 0.22f);
+            custBtnRect.pivot = new Vector2(0.5f, 0.5f);
+            custBtnRect.anchoredPosition = new Vector2(-360f, 0f);
+            custBtnRect.sizeDelta = new Vector2(220f, 66f);
+
+            Image custBtnImg = custBtnGo.AddComponent<Image>();
+            custBtnImg.color = new Color(0.15f, 0.30f, 0.50f, 0.95f); // Deep Cyan
+            Button custBtn = custBtnGo.AddComponent<Button>();
+
+            GameObject custTxtGo = new GameObject("Text");
+            custTxtGo.transform.SetParent(custBtnGo.transform, false);
+            RectTransform custTxtRect = custTxtGo.AddComponent<RectTransform>();
+            custTxtRect.anchorMin = Vector2.zero;
+            custTxtRect.anchorMax = Vector2.one;
+            custTxtRect.offsetMin = Vector2.zero;
+            custTxtRect.offsetMax = Vector2.zero;
+
+            Text custTxt = custTxtGo.AddComponent<Text>();
+            custTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            custTxt.fontSize = 20;
+            custTxt.fontStyle = FontStyle.Bold;
+            custTxt.alignment = TextAnchor.MiddleCenter;
+            custTxt.color = new Color(0.45f, 0.90f, 1f, 1f);
+            custTxt.text = "CUSTOMIZE";
+
+            // 2. Daily Rewards / Quests Button
+            GameObject rewBtnGo = new GameObject("RewardsButton");
+            rewBtnGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform rewBtnRect = rewBtnGo.AddComponent<RectTransform>();
+            rewBtnRect.anchorMin = new Vector2(0.5f, 0.22f);
+            rewBtnRect.anchorMax = new Vector2(0.5f, 0.22f);
+            rewBtnRect.pivot = new Vector2(0.5f, 0.5f);
+            rewBtnRect.anchoredPosition = new Vector2(-120f, 0f);
+            rewBtnRect.sizeDelta = new Vector2(220f, 66f);
+
+            Image rewBtnImg = rewBtnGo.AddComponent<Image>();
+            rewBtnImg.color = new Color(0.85f, 0.47f, 0.05f, 0.95f); // Amber Gold #D97706
+            Button rewBtn = rewBtnGo.AddComponent<Button>();
+
+            GameObject rewTxtGo = new GameObject("Text");
+            rewTxtGo.transform.SetParent(rewBtnGo.transform, false);
+            RectTransform rewTxtRect = rewTxtGo.AddComponent<RectTransform>();
+            rewTxtRect.anchorMin = Vector2.zero;
+            rewTxtRect.anchorMax = Vector2.one;
+            rewTxtRect.offsetMin = Vector2.zero;
+            rewTxtRect.offsetMax = Vector2.zero;
+
+            Text rewTxt = rewTxtGo.AddComponent<Text>();
+            rewTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rewTxt.fontSize = 20;
+            rewTxt.fontStyle = FontStyle.Bold;
+            rewTxt.alignment = TextAnchor.MiddleCenter;
+            rewTxt.color = new Color(1f, 0.95f, 0.70f, 1f);
+            rewTxt.text = "REWARDS";
+
+            // Rewards Notification Badge
+            GameObject rewBadgeGo = new GameObject("NotificationBadge");
+            rewBadgeGo.transform.SetParent(rewBtnGo.transform, false);
+            RectTransform rewBadgeRect = rewBadgeGo.AddComponent<RectTransform>();
+            rewBadgeRect.anchorMin = new Vector2(1f, 1f);
+            rewBadgeRect.anchorMax = new Vector2(1f, 1f);
+            rewBadgeRect.pivot = new Vector2(0.5f, 0.5f);
+            rewBadgeRect.anchoredPosition = new Vector2(-10f, -10f);
+            rewBadgeRect.sizeDelta = new Vector2(22f, 22f);
+
+            Image rewBadgeImg = rewBadgeGo.AddComponent<Image>();
+            rewBadgeImg.color = new Color(0.94f, 0.27f, 0.27f, 1f); // Red #EF4444
+
+            GameObject rewBadgeTxtGo = new GameObject("BadgeText");
+            rewBadgeTxtGo.transform.SetParent(rewBadgeGo.transform, false);
+            RectTransform rewBadgeTxtRect = rewBadgeTxtGo.AddComponent<RectTransform>();
+            rewBadgeTxtRect.anchorMin = Vector2.zero;
+            rewBadgeTxtRect.anchorMax = Vector2.one;
+            rewBadgeTxtRect.offsetMin = Vector2.zero;
+            rewBadgeTxtRect.offsetMax = Vector2.zero;
+
+            Text rewBadgeTxt = rewBadgeTxtGo.AddComponent<Text>();
+            rewBadgeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rewBadgeTxt.fontSize = 14;
+            rewBadgeTxt.fontStyle = FontStyle.Bold;
+            rewBadgeTxt.alignment = TextAnchor.MiddleCenter;
+            rewBadgeTxt.color = Color.white;
+            rewBadgeTxt.text = "!";
+
+            // 3. Statistics Button
             GameObject statsBtnGo = new GameObject("StatsButton");
             statsBtnGo.transform.SetParent(safeAreaGo.transform, false);
             RectTransform statsBtnRect = statsBtnGo.AddComponent<RectTransform>();
-            statsBtnRect.anchorMin = new Vector2(0.5f, 0.26f);
-            statsBtnRect.anchorMax = new Vector2(0.5f, 0.26f);
+            statsBtnRect.anchorMin = new Vector2(0.5f, 0.22f);
+            statsBtnRect.anchorMax = new Vector2(0.5f, 0.22f);
             statsBtnRect.pivot = new Vector2(0.5f, 0.5f);
-            statsBtnRect.anchoredPosition = new Vector2(-155f, 0f);
-            statsBtnRect.sizeDelta = new Vector2(270f, 70f);
+            statsBtnRect.anchoredPosition = new Vector2(120f, 0f);
+            statsBtnRect.sizeDelta = new Vector2(220f, 66f);
 
             Image statsBtnImg = statsBtnGo.AddComponent<Image>();
             statsBtnImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f); // Slate #1E293B
@@ -1447,20 +1927,21 @@ namespace GigaGrub.Editor
 
             Text statsTxt = statsTxtGo.AddComponent<Text>();
             statsTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            statsTxt.fontSize = 24;
+            statsTxt.fontSize = 20;
             statsTxt.fontStyle = FontStyle.Bold;
             statsTxt.alignment = TextAnchor.MiddleCenter;
             statsTxt.color = new Color(0.89f, 0.91f, 0.94f, 1f);
             statsTxt.text = "STATISTICS";
 
+            // 4. Settings Button
             GameObject settBtnGo = new GameObject("SettingsButton");
             settBtnGo.transform.SetParent(safeAreaGo.transform, false);
             RectTransform settBtnRect = settBtnGo.AddComponent<RectTransform>();
-            settBtnRect.anchorMin = new Vector2(0.5f, 0.26f);
-            settBtnRect.anchorMax = new Vector2(0.5f, 0.26f);
+            settBtnRect.anchorMin = new Vector2(0.5f, 0.22f);
+            settBtnRect.anchorMax = new Vector2(0.5f, 0.22f);
             settBtnRect.pivot = new Vector2(0.5f, 0.5f);
-            settBtnRect.anchoredPosition = new Vector2(155f, 0f);
-            settBtnRect.sizeDelta = new Vector2(270f, 70f);
+            settBtnRect.anchoredPosition = new Vector2(360f, 0f);
+            settBtnRect.sizeDelta = new Vector2(220f, 66f);
 
             Image settBtnImg = settBtnGo.AddComponent<Image>();
             settBtnImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
@@ -1476,11 +1957,21 @@ namespace GigaGrub.Editor
 
             Text settTxt = settTxtGo.AddComponent<Text>();
             settTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            settTxt.fontSize = 24;
+            settTxt.fontSize = 20;
             settTxt.fontStyle = FontStyle.Bold;
             settTxt.alignment = TextAnchor.MiddleCenter;
             settTxt.color = new Color(0.89f, 0.91f, 0.94f, 1f);
             settTxt.text = "SETTINGS";
+
+            // ==========================================
+            // CUSTOMIZATION MODAL DIALOG
+            // ==========================================
+            CreateCustomizationModal(safeAreaGo, out GameObject custModalGo, out CanvasGroup custCg, out GigaGrub.UI.Customization.CustomizationUI custUI);
+
+            // ==========================================
+            // DAILY REWARDS & QUESTS MODAL DIALOG
+            // ==========================================
+            CreateDailyRewardsAndQuestsModal(safeAreaGo, out GameObject rewardsModalGo, out CanvasGroup rewardsCg, out DailyRewardsAndQuestsUI rewardsUI);
 
             // ==========================================
             // STATISTICS MODAL DIALOG
@@ -1642,9 +2133,21 @@ namespace GigaGrub.Editor
             // Wire MainMenuUI Component References
             SerializedObject soMenu = new SerializedObject(menuUI);
             soMenu.FindProperty("playButton").objectReferenceValue = playBtn;
+            soMenu.FindProperty("customizeButton").objectReferenceValue = custBtn;
+            soMenu.FindProperty("rewardsButton").objectReferenceValue = rewBtn;
+            soMenu.FindProperty("rewardsBadge").objectReferenceValue = rewBadgeGo;
             soMenu.FindProperty("statisticsButton").objectReferenceValue = statsBtn;
             soMenu.FindProperty("settingsButton").objectReferenceValue = settBtn;
             soMenu.FindProperty("bestScoreText").objectReferenceValue = bestTxt;
+            soMenu.FindProperty("mainMenuPreviewStage").objectReferenceValue = mainPreviewStage;
+
+            soMenu.FindProperty("customizationPanel").objectReferenceValue = custModalGo;
+            soMenu.FindProperty("customizationCanvasGroup").objectReferenceValue = custCg;
+            soMenu.FindProperty("customizationUI").objectReferenceValue = custUI;
+
+            soMenu.FindProperty("rewardsPanel").objectReferenceValue = rewardsModalGo;
+            soMenu.FindProperty("rewardsCanvasGroup").objectReferenceValue = rewardsCg;
+            soMenu.FindProperty("rewardsUI").objectReferenceValue = rewardsUI;
 
             soMenu.FindProperty("statisticsPanel").objectReferenceValue = statsModalGo;
             soMenu.FindProperty("statisticsCanvasGroup").objectReferenceValue = statsCg;
@@ -1666,6 +2169,8 @@ namespace GigaGrub.Editor
             soMenu.FindProperty("gameSceneName").stringValue = "Game";
             soMenu.ApplyModifiedPropertiesWithoutUndo();
 
+            custModalGo.SetActive(false);
+            rewardsModalGo.SetActive(false);
             statsModalGo.SetActive(false);
             settModalGo.SetActive(false);
 
@@ -1675,7 +2180,707 @@ namespace GigaGrub.Editor
             eventSystemGo.AddComponent<StandaloneInputModule>();
 
             EditorSceneManager.SaveScene(scene, scenePath);
-            Debug.Log($"[GigaGrub] Saved MainMenu scene with Navigation, Statistics and Settings to {scenePath}");
+            Debug.Log($"[GigaGrub] Saved MainMenu scene with Navigation, Customization, Statistics and Settings to {scenePath}");
+        }
+
+        private static void CreateCustomizationModal(GameObject safeAreaGo, out GameObject custModalGo, out CanvasGroup custCg, out GigaGrub.UI.Customization.CustomizationUI custUI)
+        {
+            custModalGo = new GameObject("CustomizationModal");
+            custModalGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform modalRect = custModalGo.AddComponent<RectTransform>();
+            modalRect.anchorMin = Vector2.zero;
+            modalRect.anchorMax = Vector2.one;
+            modalRect.offsetMin = Vector2.zero;
+            modalRect.offsetMax = Vector2.zero;
+
+            Image modalDim = custModalGo.AddComponent<Image>();
+            modalDim.color = new Color(0f, 0f, 0f, 0.85f);
+            custCg = custModalGo.AddComponent<CanvasGroup>();
+
+            GameObject dialogGo = new GameObject("DialogBox");
+            dialogGo.transform.SetParent(custModalGo.transform, false);
+            RectTransform dialogRect = dialogGo.AddComponent<RectTransform>();
+            dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            dialogRect.pivot = new Vector2(0.5f, 0.5f);
+            dialogRect.sizeDelta = new Vector2(1160f, 640f);
+
+            Image dialogBg = dialogGo.AddComponent<Image>();
+            dialogBg.color = new Color(0.06f, 0.09f, 0.15f, 0.98f); // Deep Slate #0F172A
+
+            custUI = dialogGo.AddComponent<GigaGrub.UI.Customization.CustomizationUI>();
+
+            // 1. Header
+            GameObject headerGo = new GameObject("Header");
+            headerGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform headerRect = headerGo.AddComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0f, 0.90f);
+            headerRect.anchorMax = new Vector2(1f, 1f);
+            headerRect.offsetMin = Vector2.zero;
+            headerRect.offsetMax = Vector2.zero;
+
+            Text headerTxt = headerGo.AddComponent<Text>();
+            headerTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            headerTxt.fontSize = 28;
+            headerTxt.fontStyle = FontStyle.Bold;
+            headerTxt.alignment = TextAnchor.MiddleCenter;
+            headerTxt.color = new Color(0.29f, 0.87f, 0.50f, 1f); // Neon Emerald
+            headerTxt.text = "CREATURE CUSTOMIZATION";
+
+            // 2. Category Tab Buttons (9 Categories)
+            GameObject tabsGo = new GameObject("CategoryTabs");
+            tabsGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform tabsRect = tabsGo.AddComponent<RectTransform>();
+            tabsRect.anchorMin = new Vector2(0.02f, 0.82f);
+            tabsRect.anchorMax = new Vector2(0.98f, 0.90f);
+            tabsRect.offsetMin = Vector2.zero;
+            tabsRect.offsetMax = Vector2.zero;
+
+            string[] catNames = new string[] { "Creature", "Color", "Pattern", "Clothes", "Effects" };
+            Button[] catBtns = new Button[catNames.Length];
+            float tabWidth = 1f / catNames.Length;
+
+            for (int i = 0; i < catNames.Length; i++)
+            {
+                GameObject tBtnGo = new GameObject($"Tab_{catNames[i]}");
+                tBtnGo.transform.SetParent(tabsGo.transform, false);
+                RectTransform tRect = tBtnGo.AddComponent<RectTransform>();
+                tRect.anchorMin = new Vector2(i * tabWidth + 0.005f, 0f);
+                tRect.anchorMax = new Vector2((i + 1) * tabWidth - 0.005f, 1f);
+                tRect.offsetMin = Vector2.zero;
+                tRect.offsetMax = Vector2.zero;
+
+                Image tImg = tBtnGo.AddComponent<Image>();
+                tImg.color = new Color(0.12f, 0.16f, 0.24f, 0.90f);
+                catBtns[i] = tBtnGo.AddComponent<Button>();
+
+                GameObject tTxtGo = new GameObject("Text");
+                tTxtGo.transform.SetParent(tBtnGo.transform, false);
+                RectTransform ttRect = tTxtGo.AddComponent<RectTransform>();
+                ttRect.anchorMin = Vector2.zero;
+                ttRect.anchorMax = Vector2.one;
+                ttRect.offsetMin = Vector2.zero;
+                ttRect.offsetMax = Vector2.zero;
+
+                Text tTxt = tTxtGo.AddComponent<Text>();
+                tTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                tTxt.fontSize = 19;
+                tTxt.fontStyle = FontStyle.Bold;
+                tTxt.alignment = TextAnchor.MiddleCenter;
+                tTxt.color = Color.white;
+                tTxt.text = catNames[i];
+            }
+
+            // 3. Left Preview Stage Box
+            GameObject previewBoxGo = new GameObject("PreviewBox");
+            previewBoxGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform pbRect = previewBoxGo.AddComponent<RectTransform>();
+            pbRect.anchorMin = new Vector2(0.02f, 0.16f);
+            pbRect.anchorMax = new Vector2(0.32f, 0.80f);
+            pbRect.offsetMin = Vector2.zero;
+            pbRect.offsetMax = Vector2.zero;
+
+            Image pbBg = previewBoxGo.AddComponent<Image>();
+            pbBg.color = new Color(0.09f, 0.13f, 0.20f, 0.90f);
+
+            GigaGrub.Cosmetics.CreaturePreviewStage previewStage = previewBoxGo.AddComponent<GigaGrub.Cosmetics.CreaturePreviewStage>();
+
+            // 4. Right Scrollable Grid Area
+            GameObject scrollGo = new GameObject("ItemsScroll");
+            scrollGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform scrollRect = scrollGo.AddComponent<RectTransform>();
+            scrollRect.anchorMin = new Vector2(0.34f, 0.16f);
+            scrollRect.anchorMax = new Vector2(0.98f, 0.80f);
+            scrollRect.offsetMin = Vector2.zero;
+            scrollRect.offsetMax = Vector2.zero;
+
+            Image scrollBg = scrollGo.AddComponent<Image>();
+            scrollBg.color = new Color(0.09f, 0.13f, 0.20f, 0.50f);
+            ScrollRect sr = scrollGo.AddComponent<ScrollRect>();
+
+            GameObject viewGo = new GameObject("Viewport");
+            viewGo.transform.SetParent(scrollGo.transform, false);
+            RectTransform viewRect = viewGo.AddComponent<RectTransform>();
+            viewRect.anchorMin = Vector2.zero;
+            viewRect.anchorMax = Vector2.one;
+            viewRect.offsetMin = Vector2.zero;
+            viewRect.offsetMax = Vector2.zero;
+            viewGo.AddComponent<Mask>().showMaskGraphic = false;
+            viewGo.AddComponent<Image>();
+
+            GameObject contentGo = new GameObject("Content");
+            contentGo.transform.SetParent(viewGo.transform, false);
+            RectTransform contentRect = contentGo.AddComponent<RectTransform>();
+            contentRect.anchorMin = new Vector2(0f, 1f);
+            contentRect.anchorMax = new Vector2(1f, 1f);
+            contentRect.pivot = new Vector2(0.5f, 1f);
+            contentRect.sizeDelta = new Vector2(0f, 800f);
+
+            GridLayoutGroup glg = contentGo.AddComponent<GridLayoutGroup>();
+            glg.cellSize = new Vector2(125f, 145f);
+            glg.spacing = new Vector2(12f, 12f);
+            glg.padding = new RectOffset(12, 12, 12, 12);
+            glg.constraint = GridLayoutGroup.Constraint.Flexible;
+
+            ContentSizeFitter csf = contentGo.AddComponent<ContentSizeFitter>();
+            csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            sr.viewport = viewRect;
+            sr.content = contentRect;
+            sr.horizontal = false;
+            sr.vertical = true;
+
+            // 5. Bottom Action Bar
+            GameObject coinsGo = new GameObject("CoinsBadge");
+            coinsGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform coinsRect = coinsGo.AddComponent<RectTransform>();
+            coinsRect.anchorMin = new Vector2(0.02f, 0.03f);
+            coinsRect.anchorMax = new Vector2(0.24f, 0.13f);
+            coinsRect.offsetMin = Vector2.zero;
+            coinsRect.offsetMax = Vector2.zero;
+
+            Text coinsTxt = coinsGo.AddComponent<Text>();
+            coinsTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            coinsTxt.fontSize = 24;
+            coinsTxt.fontStyle = FontStyle.Bold;
+            coinsTxt.alignment = TextAnchor.MiddleLeft;
+            coinsTxt.color = new Color(0.99f, 0.83f, 0.30f, 1f); // Gold
+            coinsTxt.text = "COINS: 1,000";
+
+            // Equip / Unlock Action Button
+            GameObject actBtnGo = new GameObject("ActionButton");
+            actBtnGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform actRect = actBtnGo.AddComponent<RectTransform>();
+            actRect.anchorMin = new Vector2(0.38f, 0.03f);
+            actRect.anchorMax = new Vector2(0.60f, 0.13f);
+            actRect.offsetMin = Vector2.zero;
+            actRect.offsetMax = Vector2.zero;
+
+            Image actImg = actBtnGo.AddComponent<Image>();
+            actImg.color = new Color(0.06f, 0.73f, 0.51f, 1f); // Emerald
+            Button actBtn = actBtnGo.AddComponent<Button>();
+
+            GameObject actTxtGo = new GameObject("Text");
+            actTxtGo.transform.SetParent(actBtnGo.transform, false);
+            RectTransform actTxtRect = actTxtGo.AddComponent<RectTransform>();
+            actTxtRect.anchorMin = Vector2.zero;
+            actTxtRect.anchorMax = Vector2.one;
+            actTxtRect.offsetMin = Vector2.zero;
+            actTxtRect.offsetMax = Vector2.zero;
+
+            Text actTxt = actTxtGo.AddComponent<Text>();
+            actTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            actTxt.fontSize = 22;
+            actTxt.fontStyle = FontStyle.Bold;
+            actTxt.alignment = TextAnchor.MiddleCenter;
+            actTxt.color = Color.white;
+            actTxt.text = "EQUIP";
+
+            // Reset Button
+            GameObject rstBtnGo = new GameObject("ResetButton");
+            rstBtnGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform rstRect = rstBtnGo.AddComponent<RectTransform>();
+            rstRect.anchorMin = new Vector2(0.62f, 0.03f);
+            rstRect.anchorMax = new Vector2(0.78f, 0.13f);
+            rstRect.offsetMin = Vector2.zero;
+            rstRect.offsetMax = Vector2.zero;
+
+            Image rstImg = rstBtnGo.AddComponent<Image>();
+            rstImg.color = new Color(0.20f, 0.25f, 0.35f, 1f);
+            Button rstBtn = rstBtnGo.AddComponent<Button>();
+
+            GameObject rstTxtGo = new GameObject("Text");
+            rstTxtGo.transform.SetParent(rstBtnGo.transform, false);
+            RectTransform rstTxtRect = rstTxtGo.AddComponent<RectTransform>();
+            rstTxtRect.anchorMin = Vector2.zero;
+            rstTxtRect.anchorMax = Vector2.one;
+            rstTxtRect.offsetMin = Vector2.zero;
+            rstTxtRect.offsetMax = Vector2.zero;
+
+            Text rstTxt = rstTxtGo.AddComponent<Text>();
+            rstTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            rstTxt.fontSize = 20;
+            rstTxt.fontStyle = FontStyle.Bold;
+            rstTxt.alignment = TextAnchor.MiddleCenter;
+            rstTxt.color = new Color(0.85f, 0.88f, 0.92f);
+            rstTxt.text = "RESET";
+
+            // Save & Close Button
+            GameObject saveBtnGo = new GameObject("SaveCloseButton");
+            saveBtnGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform saveRect = saveBtnGo.AddComponent<RectTransform>();
+            saveRect.anchorMin = new Vector2(0.80f, 0.03f);
+            saveRect.anchorMax = new Vector2(0.98f, 0.13f);
+            saveRect.offsetMin = Vector2.zero;
+            saveRect.offsetMax = Vector2.zero;
+
+            Image saveImg = saveBtnGo.AddComponent<Image>();
+            saveImg.color = new Color(0.12f, 0.50f, 0.90f, 1f); // Blue #1D4ED8
+            Button saveBtn = saveBtnGo.AddComponent<Button>();
+
+            GameObject saveTxtGo = new GameObject("Text");
+            saveTxtGo.transform.SetParent(saveBtnGo.transform, false);
+            RectTransform saveTxtRect = saveTxtGo.AddComponent<RectTransform>();
+            saveTxtRect.anchorMin = Vector2.zero;
+            saveTxtRect.anchorMax = Vector2.one;
+            saveTxtRect.offsetMin = Vector2.zero;
+            saveTxtRect.offsetMax = Vector2.zero;
+
+            Text saveTxt = saveTxtGo.AddComponent<Text>();
+            saveTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            saveTxt.fontSize = 20;
+            saveTxt.fontStyle = FontStyle.Bold;
+            saveTxt.alignment = TextAnchor.MiddleCenter;
+            saveTxt.color = Color.white;
+            saveTxt.text = "SAVE & CLOSE";
+
+            // Wire CustomizationUI Properties
+            SerializedObject soCust = new SerializedObject(custUI);
+            soCust.FindProperty("previewStage").objectReferenceValue = previewStage;
+            soCust.FindProperty("creatureTabBtn").objectReferenceValue = catBtns[0];
+            soCust.FindProperty("colorTabBtn").objectReferenceValue = catBtns[1];
+            soCust.FindProperty("patternTabBtn").objectReferenceValue = catBtns[2];
+            soCust.FindProperty("clothingTabBtn").objectReferenceValue = catBtns[3];
+            soCust.FindProperty("effectTabBtn").objectReferenceValue = catBtns[4];
+
+            soCust.FindProperty("gridContentParent").objectReferenceValue = contentGo.transform;
+            soCust.FindProperty("coinsText").objectReferenceValue = coinsTxt;
+            soCust.FindProperty("actionButton").objectReferenceValue = actBtn;
+            soCust.FindProperty("actionButtonText").objectReferenceValue = actTxt;
+            soCust.FindProperty("resetButton").objectReferenceValue = rstBtn;
+            soCust.FindProperty("closeSaveButton").objectReferenceValue = saveBtn;
+            soCust.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void CreateDailyRewardsAndQuestsModal(GameObject safeAreaGo, out GameObject rewardsModalGo, out CanvasGroup rewardsCg, out DailyRewardsAndQuestsUI rewardsUI)
+        {
+            rewardsModalGo = new GameObject("DailyRewardsModal");
+            rewardsModalGo.transform.SetParent(safeAreaGo.transform, false);
+            RectTransform modalRect = rewardsModalGo.AddComponent<RectTransform>();
+            modalRect.anchorMin = Vector2.zero;
+            modalRect.anchorMax = Vector2.one;
+            modalRect.offsetMin = Vector2.zero;
+            modalRect.offsetMax = Vector2.zero;
+
+            Image modalDim = rewardsModalGo.AddComponent<Image>();
+            modalDim.color = new Color(0f, 0f, 0f, 0.85f);
+            rewardsCg = rewardsModalGo.AddComponent<CanvasGroup>();
+
+            GameObject dialogGo = new GameObject("DialogBox");
+            dialogGo.transform.SetParent(rewardsModalGo.transform, false);
+            RectTransform dialogRect = dialogGo.AddComponent<RectTransform>();
+            dialogRect.anchorMin = new Vector2(0.5f, 0.5f);
+            dialogRect.anchorMax = new Vector2(0.5f, 0.5f);
+            dialogRect.pivot = new Vector2(0.5f, 0.5f);
+            dialogRect.sizeDelta = new Vector2(1080f, 620f);
+
+            Image dialogBg = dialogGo.AddComponent<Image>();
+            dialogBg.color = new Color(0.06f, 0.09f, 0.15f, 0.98f); // Deep Slate #0F172A
+
+            rewardsUI = dialogGo.AddComponent<DailyRewardsAndQuestsUI>();
+
+            // 1. Header & Close Button
+            GameObject headerGo = new GameObject("Header");
+            headerGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform headerRect = headerGo.AddComponent<RectTransform>();
+            headerRect.anchorMin = new Vector2(0f, 0.90f);
+            headerRect.anchorMax = new Vector2(1f, 1f);
+            headerRect.offsetMin = Vector2.zero;
+            headerRect.offsetMax = Vector2.zero;
+
+            Text headerTxt = headerGo.AddComponent<Text>();
+            headerTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            headerTxt.fontSize = 28;
+            headerTxt.fontStyle = FontStyle.Bold;
+            headerTxt.alignment = TextAnchor.MiddleCenter;
+            headerTxt.color = new Color(0.99f, 0.83f, 0.30f, 1f); // Gold #FBBF24
+            headerTxt.text = "DAILY REWARDS & QUESTS";
+
+            // Close Button
+            GameObject closeBtnGo = new GameObject("CloseButton");
+            closeBtnGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform closeRect = closeBtnGo.AddComponent<RectTransform>();
+            closeRect.anchorMin = new Vector2(0.93f, 0.90f);
+            closeRect.anchorMax = new Vector2(0.98f, 0.98f);
+            closeRect.offsetMin = Vector2.zero;
+            closeRect.offsetMax = Vector2.zero;
+
+            Image closeImg = closeBtnGo.AddComponent<Image>();
+            closeImg.color = new Color(0.20f, 0.25f, 0.35f, 1f);
+            Button closeBtn = closeBtnGo.AddComponent<Button>();
+
+            GameObject closeTxtGo = new GameObject("Text");
+            closeTxtGo.transform.SetParent(closeBtnGo.transform, false);
+            RectTransform closeTxtRect = closeTxtGo.AddComponent<RectTransform>();
+            closeTxtRect.anchorMin = Vector2.zero;
+            closeTxtRect.anchorMax = Vector2.one;
+            closeTxtRect.offsetMin = Vector2.zero;
+            closeTxtRect.offsetMax = Vector2.zero;
+
+            Text closeTxt = closeTxtGo.AddComponent<Text>();
+            closeTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            closeTxt.fontSize = 22;
+            closeTxt.fontStyle = FontStyle.Bold;
+            closeTxt.alignment = TextAnchor.MiddleCenter;
+            closeTxt.color = Color.white;
+            closeTxt.text = "X";
+
+            // 2. Tab Switcher Buttons (Daily Rewards & Daily Quests)
+            GameObject tabsGo = new GameObject("Tabs");
+            tabsGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform tabsRect = tabsGo.AddComponent<RectTransform>();
+            tabsRect.anchorMin = new Vector2(0.20f, 0.82f);
+            tabsRect.anchorMax = new Vector2(0.80f, 0.89f);
+            tabsRect.offsetMin = Vector2.zero;
+            tabsRect.offsetMax = Vector2.zero;
+
+            // Daily Rewards Tab Button
+            GameObject dTabGo = new GameObject("Tab_DailyRewards");
+            dTabGo.transform.SetParent(tabsGo.transform, false);
+            RectTransform dTabRect = dTabGo.AddComponent<RectTransform>();
+            dTabRect.anchorMin = new Vector2(0f, 0f);
+            dTabRect.anchorMax = new Vector2(0.48f, 1f);
+            dTabRect.offsetMin = Vector2.zero;
+            dTabRect.offsetMax = Vector2.zero;
+
+            Image dTabImg = dTabGo.AddComponent<Image>();
+            dTabImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
+            Button dTabBtn = dTabGo.AddComponent<Button>();
+
+            GameObject dTabTxtGo = new GameObject("Text");
+            dTabTxtGo.transform.SetParent(dTabGo.transform, false);
+            RectTransform dTabTxtRect = dTabTxtGo.AddComponent<RectTransform>();
+            dTabTxtRect.anchorMin = Vector2.zero;
+            dTabTxtRect.anchorMax = Vector2.one;
+            dTabTxtRect.offsetMin = Vector2.zero;
+            dTabTxtRect.offsetMax = Vector2.zero;
+
+            Text dTabTxt = dTabTxtGo.AddComponent<Text>();
+            dTabTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            dTabTxt.fontSize = 18;
+            dTabTxt.fontStyle = FontStyle.Bold;
+            dTabTxt.alignment = TextAnchor.MiddleCenter;
+            dTabTxt.color = Color.white;
+            dTabTxt.text = "DAILY REWARDS";
+
+            // Quests Tab Button
+            GameObject qTabGo = new GameObject("Tab_Quests");
+            qTabGo.transform.SetParent(tabsGo.transform, false);
+            RectTransform qTabRect = qTabGo.AddComponent<RectTransform>();
+            qTabRect.anchorMin = new Vector2(0.52f, 0f);
+            qTabRect.anchorMax = new Vector2(1f, 1f);
+            qTabRect.offsetMin = Vector2.zero;
+            qTabRect.offsetMax = Vector2.zero;
+
+            Image qTabImg = qTabGo.AddComponent<Image>();
+            qTabImg.color = new Color(0.12f, 0.16f, 0.24f, 0.95f);
+            Button qTabBtn = qTabGo.AddComponent<Button>();
+
+            GameObject qTabTxtGo = new GameObject("Text");
+            qTabTxtGo.transform.SetParent(qTabGo.transform, false);
+            RectTransform qTabTxtRect = qTabTxtGo.AddComponent<RectTransform>();
+            qTabTxtRect.anchorMin = Vector2.zero;
+            qTabTxtRect.anchorMax = Vector2.one;
+            qTabTxtRect.offsetMin = Vector2.zero;
+            qTabTxtRect.offsetMax = Vector2.zero;
+
+            Text qTabTxt = qTabTxtGo.AddComponent<Text>();
+            qTabTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            qTabTxt.fontSize = 18;
+            qTabTxt.fontStyle = FontStyle.Bold;
+            qTabTxt.alignment = TextAnchor.MiddleCenter;
+            qTabTxt.color = Color.white;
+            qTabTxt.text = "DAILY MISSIONS";
+
+            // 3. Daily Rewards Panel
+            GameObject dPanelGo = new GameObject("DailyRewardsPanel");
+            dPanelGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform dPanelRect = dPanelGo.AddComponent<RectTransform>();
+            dPanelRect.anchorMin = new Vector2(0.04f, 0.14f);
+            dPanelRect.anchorMax = new Vector2(0.96f, 0.80f);
+            dPanelRect.offsetMin = Vector2.zero;
+            dPanelRect.offsetMax = Vector2.zero;
+
+            // Streak Text
+            GameObject streakGo = new GameObject("StreakText");
+            streakGo.transform.SetParent(dPanelGo.transform, false);
+            RectTransform streakRect = streakGo.AddComponent<RectTransform>();
+            streakRect.anchorMin = new Vector2(0.02f, 0.85f);
+            streakRect.anchorMax = new Vector2(0.48f, 1f);
+            streakRect.offsetMin = Vector2.zero;
+            streakRect.offsetMax = Vector2.zero;
+
+            Text streakTxt = streakGo.AddComponent<Text>();
+            streakTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            streakTxt.fontSize = 20;
+            streakTxt.fontStyle = FontStyle.Bold;
+            streakTxt.alignment = TextAnchor.MiddleLeft;
+            streakTxt.color = new Color(0.29f, 0.87f, 0.50f, 1f); // Neon Emerald
+            streakTxt.text = "STREAK: 1 DAYS";
+
+            // Countdown Text
+            GameObject cdGo = new GameObject("CountdownText");
+            cdGo.transform.SetParent(dPanelGo.transform, false);
+            RectTransform cdRect = cdGo.AddComponent<RectTransform>();
+            cdRect.anchorMin = new Vector2(0.52f, 0.85f);
+            cdRect.anchorMax = new Vector2(0.98f, 1f);
+            cdRect.offsetMin = Vector2.zero;
+            cdRect.offsetMax = Vector2.zero;
+
+            Text cdTxt = cdGo.AddComponent<Text>();
+            cdTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            cdTxt.fontSize = 18;
+            cdTxt.fontStyle = FontStyle.Bold;
+            cdTxt.alignment = TextAnchor.MiddleRight;
+            cdTxt.color = new Color(0.80f, 0.84f, 0.90f, 1f);
+            cdTxt.text = "Next Reward In: --:--:--";
+
+            // 7-Day Cards Parent
+            GameObject dayCardsParentGo = new GameObject("DayCardsParent");
+            dayCardsParentGo.transform.SetParent(dPanelGo.transform, false);
+            RectTransform cardsParentRect = dayCardsParentGo.AddComponent<RectTransform>();
+            cardsParentRect.anchorMin = new Vector2(0f, 0.26f);
+            cardsParentRect.anchorMax = new Vector2(1f, 0.82f);
+            cardsParentRect.offsetMin = Vector2.zero;
+            cardsParentRect.offsetMax = Vector2.zero;
+
+            Image[] dayCardBgs = new Image[7];
+            Text[] dayCardRewardTexts = new Text[7];
+            GameObject[] dayCardClaimedBadges = new GameObject[7];
+            int[] defaultRewards = new int[] { 100, 150, 200, 250, 350, 500, 800 };
+
+            float cardSpacing = 1f / 7f;
+            for (int i = 0; i < 7; i++)
+            {
+                GameObject cardGo = new GameObject($"DayCard_{i + 1}");
+                cardGo.transform.SetParent(dayCardsParentGo.transform, false);
+                RectTransform cRect = cardGo.AddComponent<RectTransform>();
+                cRect.anchorMin = new Vector2(i * cardSpacing + 0.006f, 0f);
+                cRect.anchorMax = new Vector2((i + 1) * cardSpacing - 0.006f, 1f);
+                cRect.offsetMin = Vector2.zero;
+                cRect.offsetMax = Vector2.zero;
+
+                Image cBg = cardGo.AddComponent<Image>();
+                cBg.color = (i == 6) ? new Color(0.25f, 0.18f, 0.06f, 0.95f) : new Color(0.10f, 0.14f, 0.22f, 0.95f);
+                dayCardBgs[i] = cBg;
+
+                // Day Label
+                GameObject dayLblGo = new GameObject("DayLabel");
+                dayLblGo.transform.SetParent(cardGo.transform, false);
+                RectTransform dLblRect = dayLblGo.AddComponent<RectTransform>();
+                dLblRect.anchorMin = new Vector2(0f, 0.72f);
+                dLblRect.anchorMax = new Vector2(1f, 0.96f);
+                dLblRect.offsetMin = Vector2.zero;
+                dLblRect.offsetMax = Vector2.zero;
+
+                Text dLblTxt = dayLblGo.AddComponent<Text>();
+                dLblTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                dLblTxt.fontSize = 18;
+                dLblTxt.fontStyle = FontStyle.Bold;
+                dLblTxt.alignment = TextAnchor.MiddleCenter;
+                dLblTxt.color = (i == 6) ? new Color(0.99f, 0.83f, 0.30f, 1f) : new Color(0.80f, 0.84f, 0.90f, 1f);
+                dLblTxt.text = $"DAY {i + 1}";
+
+                // Reward Coins Text
+                GameObject rTxtGo = new GameObject("RewardText");
+                rTxtGo.transform.SetParent(cardGo.transform, false);
+                RectTransform rTxtRect = rTxtGo.AddComponent<RectTransform>();
+                rTxtRect.anchorMin = new Vector2(0f, 0.16f);
+                rTxtRect.anchorMax = new Vector2(1f, 0.65f);
+                rTxtRect.offsetMin = Vector2.zero;
+                rTxtRect.offsetMax = Vector2.zero;
+
+                Text rTxt = rTxtGo.AddComponent<Text>();
+                rTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                rTxt.fontSize = (i == 6) ? 24 : 20;
+                rTxt.fontStyle = FontStyle.Bold;
+                rTxt.alignment = TextAnchor.MiddleCenter;
+                rTxt.color = new Color(0.99f, 0.83f, 0.30f, 1f);
+                rTxt.text = $"+{defaultRewards[i]}\nCOINS";
+                dayCardRewardTexts[i] = rTxt;
+
+                // Claimed Badge Overlay
+                GameObject badgeGo = new GameObject("ClaimedBadge");
+                badgeGo.transform.SetParent(cardGo.transform, false);
+                RectTransform badgeRect = badgeGo.AddComponent<RectTransform>();
+                badgeRect.anchorMin = Vector2.zero;
+                badgeRect.anchorMax = Vector2.one;
+                badgeRect.offsetMin = Vector2.zero;
+                badgeRect.offsetMax = Vector2.zero;
+
+                Image badgeDim = badgeGo.AddComponent<Image>();
+                badgeDim.color = new Color(0f, 0f, 0f, 0.65f);
+
+                GameObject bTxtGo = new GameObject("Text");
+                bTxtGo.transform.SetParent(badgeGo.transform, false);
+                RectTransform bTxtRect = bTxtGo.AddComponent<RectTransform>();
+                bTxtRect.anchorMin = Vector2.zero;
+                bTxtRect.anchorMax = Vector2.one;
+                bTxtRect.offsetMin = Vector2.zero;
+                bTxtRect.offsetMax = Vector2.zero;
+
+                Text bTxt = bTxtGo.AddComponent<Text>();
+                bTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                bTxt.fontSize = 18;
+                bTxt.fontStyle = FontStyle.Bold;
+                bTxt.alignment = TextAnchor.MiddleCenter;
+                bTxt.color = new Color(0.29f, 0.87f, 0.50f, 1f);
+                bTxt.text = "CLAIMED";
+
+                badgeGo.SetActive(false);
+                dayCardClaimedBadges[i] = badgeGo;
+            }
+
+            // Claim Daily Reward Button
+            GameObject claimBtnGo = new GameObject("ClaimDailyButton");
+            claimBtnGo.transform.SetParent(dPanelGo.transform, false);
+            RectTransform claimRect = claimBtnGo.AddComponent<RectTransform>();
+            claimRect.anchorMin = new Vector2(0.35f, 0.02f);
+            claimRect.anchorMax = new Vector2(0.65f, 0.20f);
+            claimRect.offsetMin = Vector2.zero;
+            claimRect.offsetMax = Vector2.zero;
+
+            Image claimImg = claimBtnGo.AddComponent<Image>();
+            claimImg.color = new Color(0.06f, 0.73f, 0.51f, 1f); // Emerald
+            Button claimBtn = claimBtnGo.AddComponent<Button>();
+
+            GameObject claimTxtGo = new GameObject("Text");
+            claimTxtGo.transform.SetParent(claimBtnGo.transform, false);
+            RectTransform claimTxtRect = claimTxtGo.AddComponent<RectTransform>();
+            claimTxtRect.anchorMin = Vector2.zero;
+            claimTxtRect.anchorMax = Vector2.one;
+            claimTxtRect.offsetMin = Vector2.zero;
+            claimTxtRect.offsetMax = Vector2.zero;
+
+            Text claimTxt = claimTxtGo.AddComponent<Text>();
+            claimTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            claimTxt.fontSize = 22;
+            claimTxt.fontStyle = FontStyle.Bold;
+            claimTxt.alignment = TextAnchor.MiddleCenter;
+            claimTxt.color = Color.white;
+            claimTxt.text = "CLAIM REWARD";
+
+            // 4. Quests Panel
+            GameObject qPanelGo = new GameObject("QuestsPanel");
+            qPanelGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform qPanelRect = qPanelGo.AddComponent<RectTransform>();
+            qPanelRect.anchorMin = new Vector2(0.04f, 0.14f);
+            qPanelRect.anchorMax = new Vector2(0.96f, 0.80f);
+            qPanelRect.offsetMin = Vector2.zero;
+            qPanelRect.offsetMax = Vector2.zero;
+
+            // Quests Header Text
+            GameObject qHdrGo = new GameObject("QuestsHeader");
+            qHdrGo.transform.SetParent(qPanelGo.transform, false);
+            RectTransform qHdrRect = qHdrGo.AddComponent<RectTransform>();
+            qHdrRect.anchorMin = new Vector2(0f, 0.88f);
+            qHdrRect.anchorMax = new Vector2(1f, 1f);
+            qHdrRect.offsetMin = Vector2.zero;
+            qHdrRect.offsetMax = Vector2.zero;
+
+            Text qHdrTxt = qHdrGo.AddComponent<Text>();
+            qHdrTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            qHdrTxt.fontSize = 18;
+            qHdrTxt.fontStyle = FontStyle.Bold;
+            qHdrTxt.alignment = TextAnchor.MiddleLeft;
+            qHdrTxt.color = new Color(0.80f, 0.84f, 0.90f, 1f);
+            qHdrTxt.text = "Complete daily quests across matches to earn bonus coins!";
+
+            // Scrollable Quests List
+            GameObject qScrollGo = new GameObject("QuestsScroll");
+            qScrollGo.transform.SetParent(qPanelGo.transform, false);
+            RectTransform qScrollRect = qScrollGo.AddComponent<RectTransform>();
+            qScrollRect.anchorMin = new Vector2(0f, 0f);
+            qScrollRect.anchorMax = new Vector2(1f, 0.86f);
+            qScrollRect.offsetMin = Vector2.zero;
+            qScrollRect.offsetMax = Vector2.zero;
+
+            ScrollRect qSr = qScrollGo.AddComponent<ScrollRect>();
+
+            GameObject qViewGo = new GameObject("Viewport");
+            qViewGo.transform.SetParent(qScrollGo.transform, false);
+            RectTransform qViewRect = qViewGo.AddComponent<RectTransform>();
+            qViewRect.anchorMin = Vector2.zero;
+            qViewRect.anchorMax = Vector2.one;
+            qViewRect.offsetMin = Vector2.zero;
+            qViewRect.offsetMax = Vector2.zero;
+            qViewGo.AddComponent<Mask>().showMaskGraphic = false;
+            qViewGo.AddComponent<Image>();
+
+            GameObject qContentGo = new GameObject("Content");
+            qContentGo.transform.SetParent(qViewGo.transform, false);
+            RectTransform qContentRect = qContentGo.AddComponent<RectTransform>();
+            qContentRect.anchorMin = new Vector2(0f, 1f);
+            qContentRect.anchorMax = new Vector2(1f, 1f);
+            qContentRect.pivot = new Vector2(0.5f, 1f);
+            qContentRect.sizeDelta = new Vector2(0f, 400f);
+
+            VerticalLayoutGroup vlg = qContentGo.AddComponent<VerticalLayoutGroup>();
+            vlg.spacing = 10;
+            vlg.padding = new RectOffset(6, 6, 6, 6);
+            vlg.childForceExpandWidth = true;
+            vlg.childForceExpandHeight = false;
+            vlg.childControlWidth = true;
+            vlg.childControlHeight = false;
+
+            ContentSizeFitter qCsf = qContentGo.AddComponent<ContentSizeFitter>();
+            qCsf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            qSr.viewport = qViewRect;
+            qSr.content = qContentRect;
+            qSr.horizontal = false;
+            qSr.vertical = true;
+
+            // 5. Common Bottom Coin Badge
+            GameObject uCoinsGo = new GameObject("UserCoinsBadge");
+            uCoinsGo.transform.SetParent(dialogGo.transform, false);
+            RectTransform uCoinsRect = uCoinsGo.AddComponent<RectTransform>();
+            uCoinsRect.anchorMin = new Vector2(0.04f, 0.03f);
+            uCoinsRect.anchorMax = new Vector2(0.35f, 0.12f);
+            uCoinsRect.offsetMin = Vector2.zero;
+            uCoinsRect.offsetMax = Vector2.zero;
+
+            Text uCoinsTxt = uCoinsGo.AddComponent<Text>();
+            uCoinsTxt.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            uCoinsTxt.fontSize = 22;
+            uCoinsTxt.fontStyle = FontStyle.Bold;
+            uCoinsTxt.alignment = TextAnchor.MiddleLeft;
+            uCoinsTxt.color = new Color(0.99f, 0.83f, 0.30f, 1f);
+            uCoinsTxt.text = "COINS: 1,000";
+
+            // Wire DailyRewardsAndQuestsUI Component References
+            SerializedObject soRew = new SerializedObject(rewardsUI);
+            soRew.FindProperty("dailyRewardsTabBtn").objectReferenceValue = dTabBtn;
+            soRew.FindProperty("questsTabBtn").objectReferenceValue = qTabBtn;
+            soRew.FindProperty("dailyRewardsPanel").objectReferenceValue = dPanelGo;
+            soRew.FindProperty("questsPanel").objectReferenceValue = qPanelGo;
+
+            soRew.FindProperty("streakText").objectReferenceValue = streakTxt;
+            soRew.FindProperty("countdownText").objectReferenceValue = cdTxt;
+            soRew.FindProperty("claimDailyBtn").objectReferenceValue = claimBtn;
+            soRew.FindProperty("claimDailyBtnText").objectReferenceValue = claimTxt;
+            soRew.FindProperty("dayCardsParent").objectReferenceValue = dayCardsParentGo.transform;
+
+            SerializedProperty bgsProp = soRew.FindProperty("dayCardBgs");
+            bgsProp.arraySize = 7;
+            for (int i = 0; i < 7; i++) bgsProp.GetArrayElementAtIndex(i).objectReferenceValue = dayCardBgs[i];
+
+            SerializedProperty rewTextsProp = soRew.FindProperty("dayCardRewardTexts");
+            rewTextsProp.arraySize = 7;
+            for (int i = 0; i < 7; i++) rewTextsProp.GetArrayElementAtIndex(i).objectReferenceValue = dayCardRewardTexts[i];
+
+            SerializedProperty badgesProp = soRew.FindProperty("dayCardClaimedBadges");
+            badgesProp.arraySize = 7;
+            for (int i = 0; i < 7; i++) badgesProp.GetArrayElementAtIndex(i).objectReferenceValue = dayCardClaimedBadges[i];
+
+            soRew.FindProperty("questsContentParent").objectReferenceValue = qContentGo.transform;
+            soRew.FindProperty("questsCoinsHeader").objectReferenceValue = qHdrTxt;
+
+            soRew.FindProperty("closeButton").objectReferenceValue = closeBtn;
+            soRew.FindProperty("userCoinsText").objectReferenceValue = uCoinsTxt;
+            soRew.ApplyModifiedPropertiesWithoutUndo();
+
+            qPanelGo.SetActive(false);
         }
 
         private static Text CreateStatsRow(GameObject parent, string label, Vector2 anchorY, Color valColor)
@@ -2566,6 +3771,429 @@ namespace GigaGrub.Editor
             Object.DestroyImmediate(mockMusicGo);
             Object.DestroyImmediate(mockSettPanelGo);
             Object.DestroyImmediate(testMenuCanvasGo);
+
+            // --- Section 15: Creature Speed Boost & Energy System Verification ---
+            GameObject boostTestGo = new GameObject("BoostTestCreature");
+            BoostSystem testBoost = boostTestGo.AddComponent<BoostSystem>();
+            testBoost.Configure(5.0f, 9.5f, 100f, 35f, 22f, 0.4f, 5.0f);
+
+            // 1. Initial State
+            Assert(Mathf.Approximately(testBoost.CurrentEnergy, 100f), "BoostSystem initializes at maximum energy (100)");
+            Assert(!testBoost.IsBoosting, "BoostSystem is inactive by default");
+            Assert(Mathf.Approximately(testBoost.TargetSpeed, 5.0f), "Target speed is normal speed (5.0) when inactive");
+
+            // 2. Boost Consumption
+            testBoost.SetBoostIntent(true);
+            testBoost.UpdateEnergy(1.0f);
+            Assert(Mathf.Approximately(testBoost.CurrentEnergy, 65f), "BoostSystem consumed 35 energy over 1 second (100 -> 65)");
+            Assert(testBoost.IsBoosting, "BoostSystem is actively boosting");
+            Assert(Mathf.Approximately(testBoost.TargetSpeed, 9.5f), "Target speed is boost speed (9.5) when boosting");
+
+            // 3. Exhaustion & Zero-Energy Lockout
+            testBoost.UpdateEnergy(2.0f); // 65 - 70 => 0 clamped
+            Assert(Mathf.Approximately(testBoost.CurrentEnergy, 0f), "BoostSystem energy clamped strictly at 0 without negative values");
+            Assert(!testBoost.IsBoosting, "BoostSystem automatically terminates boosting when energy reaches 0");
+            Assert(Mathf.Approximately(testBoost.TargetSpeed, 5.0f), "Target speed returns to normal speed (5.0) when energy is depleted");
+
+            // 4. Zero Lockout Resistance
+            testBoost.SetBoostIntent(true);
+            testBoost.UpdateEnergy(0.5f);
+            Assert(!testBoost.IsBoosting, "BoostSystem strictly prevents boosting when energy is 0 despite boost intent");
+
+            // 5. Cooldown Delay & Regeneration
+            testBoost.SetBoostIntent(false);
+            testBoost.UpdateEnergy(0.2f); // Within 0.4s delay
+            Assert(Mathf.Approximately(testBoost.CurrentEnergy, 0f), "Energy does not regenerate during cooldown delay (0.2s < 0.4s)");
+
+            testBoost.UpdateEnergy(0.5f); // 0.7s total elapsed (0.3s active regen at 22/s = 6.6)
+            Assert(testBoost.CurrentEnergy > 5.0f, "Energy regenerated successfully after cooldown delay threshold");
+
+            // 6. HoldButton Component Verification
+            GameObject mockHoldBtnGo = new GameObject("MockHoldButton");
+            Image mockHoldImg = mockHoldBtnGo.AddComponent<Image>();
+            HoldButton mockHoldBtn = mockHoldBtnGo.AddComponent<HoldButton>();
+            Assert(!mockHoldBtn.IsPressed, "HoldButton is unpressed by default");
+
+            // 7. BoostEnergyBarUI Gauge Verification
+            GameObject mockBarGo = new GameObject("MockBoostBar");
+            Image mockBarFill = mockBarGo.AddComponent<Image>();
+            mockBarFill.type = Image.Type.Filled;
+            BoostEnergyBarUI mockBarUI = mockBarGo.AddComponent<BoostEnergyBarUI>();
+            SerializedObject soMockBar = new SerializedObject(mockBarUI);
+            soMockBar.FindProperty("fillImage").objectReferenceValue = mockBarFill;
+            soMockBar.ApplyModifiedPropertiesWithoutUndo();
+
+            mockBarUI.BindBoostSystem(testBoost);
+            testBoost.SetCurrentEnergy(50f);
+            Assert(Mathf.Approximately(mockBarUI.NormalizedEnergy, 0.5f), "BoostEnergyBarUI reflects normalized 50% energy accurately");
+
+            // Cleanup Boost test objects
+            Object.DestroyImmediate(mockBarGo);
+            Object.DestroyImmediate(mockHoldBtnGo);
+            Object.DestroyImmediate(boostTestGo);
+
+            // --- Section 16: Power-Ups System Verification ---
+            // 1. PowerUpData Configuration Verification
+            PowerUpData[] pData = SetupPowerUpDataAssets();
+            Assert(pData.Length == 3, "SetupPowerUpDataAssets generated 3 PowerUpData assets");
+            Assert(pData[0].Type == PowerUpType.SpeedBoost && Mathf.Approximately(pData[0].Duration, 8.0f) && Mathf.Approximately(pData[0].EffectStrength, 3.5f), "Speed Boost configured correctly (8s duration, 3.5 bonus)");
+            Assert(pData[1].Type == PowerUpType.FoodMagnet && Mathf.Approximately(pData[1].Duration, 10.0f) && Mathf.Approximately(pData[1].EffectStrength, 6.0f), "Food Magnet configured correctly (10s duration, 6.0 radius)");
+            Assert(pData[2].Type == PowerUpType.ScoreMultiplier && Mathf.Approximately(pData[2].Duration, 12.0f) && Mathf.Approximately(pData[2].EffectStrength, 2.0f), "Score Multiplier configured correctly (12s duration, 2.0x)");
+
+            // 2. ActivePowerUp State Verification
+            ActivePowerUp activePu = new ActivePowerUp(pData[0]);
+            Assert(!activePu.IsExpired, "ActivePowerUp is not expired initially");
+            Assert(Mathf.Approximately(activePu.NormalizedProgress, 1.0f), "ActivePowerUp NormalizedProgress is 1.0 initially");
+            activePu.Update(4.0f);
+            Assert(Mathf.Approximately(activePu.RemainingTime, 4.0f), "ActivePowerUp RemainingTime reduced by 4.0s");
+            Assert(Mathf.Approximately(activePu.NormalizedProgress, 0.5f), "ActivePowerUp NormalizedProgress is 0.5 at midpoint");
+            activePu.ResetDuration();
+            Assert(Mathf.Approximately(activePu.RemainingTime, 8.0f), "ActivePowerUp ResetDuration resets RemainingTime to total duration (8.0s)");
+            activePu.Update(8.1f);
+            Assert(activePu.IsExpired, "ActivePowerUp is expired after full duration");
+
+            // 3. PowerUpManager & Multiplier Verification
+            GameObject puPlayerGo = new GameObject("TestPowerUpPlayer");
+            PlayerBody puPlayerBody = puPlayerGo.AddComponent<PlayerBody>();
+            PowerUpManager puMgr = puPlayerGo.AddComponent<PowerUpManager>();
+
+            GameObject puScoreMgrGo = new GameObject("PowerUpScoreManager");
+            ScoreManager puSm = puScoreMgrGo.AddComponent<ScoreManager>();
+
+            // Speed Boost activation
+            puMgr.ActivatePowerUp(pData[0]);
+            Assert(puMgr.IsPowerUpActive(PowerUpType.SpeedBoost), "PowerUpManager activates Speed Boost");
+            Assert(Mathf.Approximately(puMgr.SpeedBonus, 3.5f), "PowerUpManager calculates correct SpeedBonus (3.5)");
+
+            // Score Multiplier activation
+            puMgr.ActivatePowerUp(pData[2]);
+            Assert(puMgr.IsPowerUpActive(PowerUpType.ScoreMultiplier), "PowerUpManager activates Score Multiplier");
+            Assert(Mathf.Approximately(puSm.ScoreMultiplier, 2.0f), "ScoreManager multiplier set to 2.0x by PowerUpManager");
+
+            // Duplicate pickup refresh
+            puMgr.UpdateTimers(4.0f);
+            puMgr.ActivatePowerUp(pData[0]); // refresh
+            ActivePowerUp refreshedActive = puMgr.GetActivePowerUp(PowerUpType.SpeedBoost);
+            Assert(refreshedActive != null && Mathf.Approximately(refreshedActive.RemainingTime, 8.0f), "Duplicate pickup refreshes active duration back to full 8.0s");
+
+            // Expiration
+            puMgr.UpdateTimers(8.5f); // expires speed boost
+            Assert(!puMgr.IsPowerUpActive(PowerUpType.SpeedBoost), "Speed Boost expired and deactivated");
+            Assert(Mathf.Approximately(puMgr.SpeedBonus, 0f), "SpeedBonus reset to 0 upon expiration");
+
+            puMgr.UpdateTimers(4.0f); // expires score multiplier
+            Assert(!puMgr.IsPowerUpActive(PowerUpType.ScoreMultiplier), "Score Multiplier expired and deactivated");
+            Assert(Mathf.Approximately(puSm.ScoreMultiplier, 1.0f), "ScoreManager multiplier reset to 1.0x upon expiration");
+
+            // 4. PowerUpPickup Collision & Pooling Verification
+            GameObject pickupGo = new GameObject("TestPickup");
+            PowerUpPickup pickupComp = pickupGo.AddComponent<PowerUpPickup>();
+            pickupComp.Initialize(pData[1]);
+            Assert(pickupGo.activeSelf, "PowerUpPickup is active after initialization");
+
+            GameObject puHeadGo = new GameObject("PlayerHead");
+            puHeadGo.tag = "Player";
+            puHeadGo.transform.SetParent(puPlayerGo.transform);
+            CircleCollider2D headCol = puHeadGo.AddComponent<CircleCollider2D>();
+
+            pickupComp.OnTriggerEnter2D(headCol);
+            Assert(puMgr.IsPowerUpActive(PowerUpType.FoodMagnet), "PowerUpPickup trigger collection activates Food Magnet on Player");
+            Assert(!pickupGo.activeSelf, "PowerUpPickup deactivates gameobject upon collection for pool recycling");
+
+            // Cleanup PowerUp test objects
+            Object.DestroyImmediate(pickupGo);
+            Object.DestroyImmediate(puPlayerGo);
+            Object.DestroyImmediate(puScoreMgrGo);
+
+            // --- Section 17: Bioluminescent Visual Identity & 10 Creature Skins Verification ---
+            // 1. Creature Skin Asset Generation
+            CreatureSkinData[] testSkins = SetupCreatureSkinAssets();
+            Assert(testSkins != null && testSkins.Length == 10, "SetupCreatureSkinAssets generated exactly 10 distinct CreatureSkinData assets");
+
+            for (int i = 0; i < testSkins.Length; i++)
+            {
+                CreatureSkinData s = testSkins[i];
+                Assert(s != null && s.HeadSprite != null && s.SegmentSprite != null, $"CreatureSkin #{i + 1} ({s?.SkinName}) has valid HeadSprite and SegmentSprite");
+                Assert(s.PrimaryColor.a > 0.5f && s.SecondaryColor.a > 0.5f, $"CreatureSkin #{i + 1} ({s?.SkinName}) has valid vibrant color palette");
+            }
+
+            // 2. Player Skin Application
+            GameObject testSkinPlayerGo = new GameObject("TestSkinPlayer");
+            SpriteRenderer testSr = testSkinPlayerGo.AddComponent<SpriteRenderer>();
+            PlayerBody testSkinBody = testSkinPlayerGo.AddComponent<PlayerBody>();
+            testSkinBody.SetSkin(testSkins[0]); // Player Giga Grub
+            Assert(testSr.sprite == testSkins[0].HeadSprite, "PlayerBody.SetSkin applied Player head sprite to SpriteRenderer");
+            Assert(testSr.color == testSkins[0].PrimaryColor, "PlayerBody.SetSkin applied Player primary theme color");
+
+            // 3. AI Spawner Skin Distribution
+            GameObject testSkinSpawnerGo = new GameObject("TestSkinAISpawner");
+            AISpawner testSkinSpawner = testSkinSpawnerGo.AddComponent<AISpawner>();
+            CreatureSkinData[] testBotSkins = new CreatureSkinData[9];
+            for (int i = 1; i < 10; i++) testBotSkins[i - 1] = testSkins[i];
+            testSkinSpawner.SetSkins(testBotSkins);
+            Assert(testSkinSpawner.BotSkins != null && testSkinSpawner.BotSkins.Length == 9, "AISpawner configured with 9 distinct bot skins");
+
+            // 4. Food Visual Assets
+            FoodData[] testFoods = SetupFoodDataAssets();
+            Assert(testFoods.Length == 3, "SetupFoodDataAssets configured 3 Celestial FoodData assets");
+            Assert(testFoods[0].FoodSprite != null && testFoods[0].FoodName == "Star Berry", "Standard food configured with Star Berry sprite");
+            Assert(testFoods[1].FoodSprite != null && testFoods[1].FoodName == "Jelly Drop", "Super food configured with Jelly Drop sprite");
+            Assert(testFoods[2].FoodSprite != null && testFoods[2].FoodName == "Astral Core", "Mega food configured with Astral Core sprite");
+
+            // Cleanup skin test objects
+            Object.DestroyImmediate(testSkinSpawnerGo);
+            Object.DestroyImmediate(testSkinPlayerGo);
+
+            // --- Section 18: Modular Creature Customization System Verification ---
+            // 1. Build and verify complete database assets
+            CosmeticDatabase testCosmeticsDb = CosmeticDatabaseBuilder.BuildAndSaveAllCosmetics();
+            Assert(testCosmeticsDb != null, "CosmeticDatabase successfully built and saved");
+            Assert(testCosmeticsDb.Creatures != null && testCosmeticsDb.Creatures.Count == 6, "CosmeticDatabase contains 6 Creature Types (Grub, Slime, Dragon, Alien, Lizard, Monster)");
+            Assert(testCosmeticsDb.SkinColors != null && testCosmeticsDb.SkinColors.Count == 14, "CosmeticDatabase contains 14 Skin Colors with dual palette / gradient presets");
+            Assert(testCosmeticsDb.Patterns != null && testCosmeticsDb.Patterns.Count == 8, "CosmeticDatabase contains 8 Body Patterns (Solid, Stripes, Spots, Gradient, Checker, Glow, Metallic, Neon)");
+            Assert(testCosmeticsDb.Clothing != null && testCosmeticsDb.Clothing.Count == 15, "CosmeticDatabase contains 15 Outfits with Head and Segment overlays");
+            Assert(testCosmeticsDb.Hats != null && testCosmeticsDb.Hats.Count == 15, "CosmeticDatabase contains 15 Head Accessories / Hats");
+            Assert(testCosmeticsDb.Eyes != null && testCosmeticsDb.Eyes.Count == 8, "CosmeticDatabase contains 8 Eye Expressions");
+            Assert(testCosmeticsDb.Mouths != null && testCosmeticsDb.Mouths.Count == 8, "CosmeticDatabase contains 8 Mouth Expressions");
+            Assert(testCosmeticsDb.Accessories != null && testCosmeticsDb.Accessories.Count == 15, "CosmeticDatabase contains 15 Accessories across multiple body slots");
+            Assert(testCosmeticsDb.Effects != null && testCosmeticsDb.Effects.Count == 10, "CosmeticDatabase contains 10 Cosmetic Visual Effects");
+
+            // 2. Skin Color Palette & Gradient Evaluation
+            SkinColorData rainbowColor = testCosmeticsDb.GetColor("color_12_rainbow");
+            Assert(rainbowColor != null, "Found rainbow gradient skin color asset");
+            Color headColor = rainbowColor.EvaluateSegmentColor(0f);
+            Color midColor = rainbowColor.EvaluateSegmentColor(0.5f);
+            Color tailColor = rainbowColor.EvaluateSegmentColor(1.0f);
+            Assert(headColor.a > 0.5f && midColor.a > 0.5f && tailColor.a > 0.5f, "SkinColorData evaluates segment colors smoothly across gradient spectrum");
+
+            // 3. EquippedCosmetics Configuration & Cloning
+            EquippedCosmetics testEq = new EquippedCosmetics();
+            testEq.CreatureId = "creature_03_dragon";
+            testEq.ColorId = "color_02_crimson";
+            testEq.PatternId = "pattern_02_stripes";
+            testEq.ClothingId = "clothing_05_armor";
+            testEq.HatId = "hat_02_crown";
+            testEq.EyesId = "eyes_02_angry";
+            testEq.MouthId = "mouth_05_vampire";
+            testEq.BackAccessoryId = "acc_02_wings";
+            testEq.TailAccessoryId = "acc_07_pet";
+            testEq.EffectId = "fx_01_fire";
+
+            EquippedCosmetics testEqClone = testEq.Clone();
+            Assert(testEqClone.CreatureId == "creature_03_dragon" && testEqClone.HatId == "hat_02_crown" && testEqClone.TailAccessoryId == "acc_07_pet", "EquippedCosmetics deep clones all 10 cosmetic equipment slots independently");
+
+            // 4. SaveData Version 2 Migration & Economy Persistence
+            SaveData v2Data = new SaveData();
+            Assert(v2Data.Version == 2, "SaveData initialized with Version 2 schema");
+            Assert(v2Data.Coins == 1000, "SaveData provides 1,000 starter bonus coins");
+            Assert(v2Data.UnlockedCosmetics != null && v2Data.UnlockedCosmetics.Contains("creature_01_grub") && v2Data.UnlockedCosmetics.Contains("color_01_emerald"), "SaveData unlocks starter creature and default cosmetics automatically");
+            Assert(v2Data.Equipped != null && v2Data.Equipped.CreatureId == "creature_01_grub", "SaveData has valid equipped creature configuration");
+
+            // Save / Load Roundtrip Simulation
+            v2Data.Coins = 2500;
+            v2Data.Equipped = testEq;
+            v2Data.UnlockedCosmetics.Add("clothing_05_armor");
+            v2Data.UnlockedCosmetics.Add("hat_02_crown");
+            string jsonSave = JsonUtility.ToJson(v2Data);
+            SaveData loadedData = JsonUtility.FromJson<SaveData>(jsonSave);
+            Assert(loadedData.Coins == 2500, "SaveData persists coin economy");
+            Assert(loadedData.Equipped.HatId == "hat_02_crown" && loadedData.Equipped.ClothingId == "clothing_05_armor", "SaveData persists equipped cosmetics across simulated app restarts");
+            Assert(loadedData.UnlockedCosmetics.Contains("hat_02_crown"), "SaveData persists unlocked inventory collection");
+
+            // 5. CosmeticManager Singleton & Inventory Purchasing
+            GameObject cosMgrGo = new GameObject("TestCosmeticManager");
+            CosmeticManager cosMgr = cosMgrGo.AddComponent<CosmeticManager>();
+            cosMgr.Initialize();
+
+            Assert(cosMgr.Inventory != null, "CosmeticManager initialized CosmeticInventory instance");
+            Assert(cosMgr.Inventory.IsUnlocked("creature_01_grub"), "Starter creature is unlocked in inventory");
+            
+            // Unlock an item with price
+            ClothingData armorData = testCosmeticsDb.GetClothing("clothing_05_armor");
+            bool purchaseResult = cosMgr.Inventory.UnlockCosmetic(armorData);
+            Assert(purchaseResult, "CosmeticInventory unlocks item successfully with coins");
+            Assert(cosMgr.Inventory.IsUnlocked("clothing_05_armor"), "Item is registered as unlocked after purchase");
+
+            // Equip and Unequip
+            cosMgr.Inventory.EquipCosmetic(armorData);
+            Assert(cosMgr.Inventory.Equipped.ClothingId == "clothing_05_armor", "EquippedCosmetics reflects equipped clothing item");
+            cosMgr.Inventory.UnequipCosmetic(CosmeticCategory.Clothing);
+            Assert(string.IsNullOrEmpty(cosMgr.Inventory.Equipped.ClothingId), "CosmeticInventory unequipped clothing successfully");
+
+            // 6. CreatureCosmeticController Live Application on Player
+            GameObject testCosPlayerGo = new GameObject("TestCosmeticPlayer");
+            SpriteRenderer pHeadSr = testCosPlayerGo.AddComponent<SpriteRenderer>();
+            PlayerBody testCosBody = testCosPlayerGo.AddComponent<PlayerBody>();
+            CreatureCosmeticController cosCtrl = testCosPlayerGo.AddComponent<CreatureCosmeticController>();
+            
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetCreature("creature_03_dragon"));
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetColor("color_02_crimson"));
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetHat("hat_02_crown"));
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetEyes("eyes_02_angry"));
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetMouth("mouth_05_vampire"));
+            cosMgr.Inventory.EquipCosmetic(armorData);
+            cosMgr.Inventory.EquipCosmetic(testCosmeticsDb.GetAccessory("acc_07_pet")); // Tail accessory
+
+            cosCtrl.ApplyCosmetics(cosMgr.Inventory.Equipped);
+            Assert(pHeadSr.sprite != null, "CreatureCosmeticController configured head sprite for dragon");
+            Assert(cosCtrl.HatRenderer != null && cosCtrl.HatRenderer.sprite != null, "CreatureCosmeticController rendered hat accessory crown");
+            Assert(cosCtrl.EyesRenderer != null && cosCtrl.EyesRenderer.sprite != null, "CreatureCosmeticController rendered angry eyes");
+            Assert(cosCtrl.MouthRenderer != null && cosCtrl.MouthRenderer.sprite != null, "CreatureCosmeticController rendered vampire mouth");
+
+            // 7. Dynamic Growth to 100+ Segments with Clothing Alignment
+            GameObject segPrefab = SetupPlayerSegmentPrefab();
+            testCosBody.InitializeRuntime(segPrefab);
+            for (int i = 0; i < 105; i++)
+            {
+                testCosBody.AddSegmentInternal(true);
+            }
+            Assert(testCosBody.Segments.Count == 105, "Player successfully grew to 105 segments");
+            
+            // Verify segments have SegmentCosmeticRenderer and clothing overlays
+            SegmentCosmeticRenderer segCos0 = testCosBody.Segments[0].GetComponent<SegmentCosmeticRenderer>();
+            SegmentCosmeticRenderer segCosLast = testCosBody.Segments[104].GetComponent<SegmentCosmeticRenderer>();
+            Assert(segCos0 != null && segCosLast != null, "All 105 segments have SegmentCosmeticRenderer attached");
+            Assert(segCos0.ClothingOverlayRenderer != null && segCos0.ClothingOverlayRenderer.sprite != null, "Segment clothing overlay active and aligned on body segment");
+            Assert(segCosLast.TailAccessoryRenderer != null && segCosLast.TailAccessoryRenderer.sprite != null, "Tail accessory rendered on the final creature segment (105th segment)");
+
+            // 8. AI Randomized Cosmetic Distribution
+            for (int bot = 0; bot < 10; bot++)
+            {
+                GameObject botGo = new GameObject($"TestAIBot_{bot}");
+                botGo.AddComponent<SpriteRenderer>();
+                PlayerBody botBody = botGo.AddComponent<PlayerBody>();
+                botBody.InitializeRuntime(segPrefab);
+                for (int s = 0; s < 5; s++) botBody.AddSegmentInternal(true);
+                
+                cosMgr.ApplyRandomCosmeticsToAI(botBody);
+                CreatureCosmeticController botCtrl = botGo.GetComponent<CreatureCosmeticController>();
+                Assert(botCtrl != null && botCtrl.CurrentEquipped != null, $"AI Bot #{bot + 1} received valid randomized cosmetics without allocations");
+                Object.DestroyImmediate(botGo);
+            }
+
+            // Cleanup Cosmetic test objects
+            Object.DestroyImmediate(testCosPlayerGo);
+            Object.DestroyImmediate(cosMgrGo);
+
+            // --- Section 19: Daily Rewards, Quests & Coin Economy Integration Verification ---
+            // 1. DailyRewardManager 7-Day Ladder & Streak Mechanics
+            GameObject testDailyGo = new GameObject("TestDailyRewardManager");
+            DailyRewardManager dailyMgr = testDailyGo.AddComponent<DailyRewardManager>();
+
+            Assert(dailyMgr.GetCurrentStreakDay() >= 1, "DailyRewardManager initialized streak tracking");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(1) == 100, "Day 1 reward is 100 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(2) == 150, "Day 2 reward is 150 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(3) == 200, "Day 3 reward is 200 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(4) == 250, "Day 4 reward is 250 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(5) == 350, "Day 5 reward is 350 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(6) == 500, "Day 6 reward is 500 coins");
+            Assert(DailyRewardManager.GetRewardCoinsForDay(7) == 800, "Day 7 grand reward is 800 coins");
+
+            // Setup CosmeticManager for economy testing
+            GameObject cosMgrTestGo = new GameObject("TestCosmeticManagerEconomy");
+            CosmeticManager cosMgrEco = cosMgrTestGo.AddComponent<CosmeticManager>();
+            cosMgrEco.Initialize();
+            int startCoins = cosMgrEco.Inventory.Coins;
+
+            // Claim Day 1 Reward
+            bool firstClaim = dailyMgr.ClaimTodayReward();
+            if (firstClaim)
+            {
+                Assert(cosMgrEco.Inventory.Coins == startCoins + 100, "Claiming Day 1 reward credited 100 coins directly to CosmeticInventory");
+                bool doubleClaim = dailyMgr.ClaimTodayReward();
+                Assert(!doubleClaim, "DailyRewardManager rejected duplicate claim on the same calendar date");
+            }
+            else
+            {
+                Assert(!dailyMgr.IsRewardAvailable(), "DailyRewardManager correctly detected that today's reward was already claimed");
+            }
+
+            // 2. QuestManager Daily Quest Generation & Rotation
+            GameObject testQuestGo = new GameObject("TestQuestManager");
+            QuestManager questMgr = testQuestGo.AddComponent<QuestManager>();
+            questMgr.InitializeDailyQuests();
+
+            Assert(questMgr.ActiveQuests != null && questMgr.ActiveQuests.Count == 4, "QuestManager generated 4 rotating daily quests");
+            for (int q = 0; q < questMgr.ActiveQuests.Count; q++)
+            {
+                QuestProgress qp = questMgr.ActiveQuests[q];
+                Assert(!string.IsNullOrEmpty(qp.QuestId) && !string.IsNullOrEmpty(qp.Title) && qp.TargetAmount > 0 && qp.RewardCoins > 0, $"Quest #{q + 1} ({qp.Title}) configured with valid target and reward coins");
+            }
+
+            // 3. Quest Real-Time Event Reporting & Progression
+            int preQuestCoins = cosMgrEco.Inventory.Coins;
+            questMgr.ReportFoodEaten(testFoods[2]); // Astral Core Mega
+            questMgr.ReportFoodEaten(testFoods[0]); // Standard Food
+            questMgr.ReportAIDefeated(5);
+            questMgr.ReportLengthReached(100);
+            questMgr.ReportMatchFinished(1); // 1st Place Victory
+
+            // Find completed quest and claim reward
+            QuestProgress completedQuest = null;
+            for (int q = 0; q < questMgr.ActiveQuests.Count; q++)
+            {
+                if (questMgr.ActiveQuests[q].IsCompleted)
+                {
+                    completedQuest = questMgr.ActiveQuests[q];
+                    break;
+                }
+            }
+
+            if (completedQuest != null)
+            {
+                bool claimQuestRes = questMgr.ClaimQuest(completedQuest.QuestId);
+                Assert(claimQuestRes, "QuestManager claimed completed quest reward successfully");
+                Assert(completedQuest.IsClaimed, "Completed quest status updated to IsClaimed");
+                Assert(cosMgrEco.Inventory.Coins == preQuestCoins + completedQuest.RewardCoins, "Claiming quest credited reward coins directly to CosmeticInventory");
+            }
+
+            // 4. Mega Food In-Game Bonus Coin Collection (+15 Coins)
+            GameObject testEcoPlayerGo = new GameObject("TestEcoPlayer");
+            testEcoPlayerGo.AddComponent<SpriteRenderer>();
+            PlayerBody testEcoBody = testEcoPlayerGo.AddComponent<PlayerBody>();
+            testEcoBody.InitializeRuntime(segPrefab);
+
+            FoodData megaFoodData = testFoods[2]; // Astral Core (Mega)
+            int coinsBeforeMegaFood = cosMgrEco.Inventory.Coins;
+            testEcoBody.OnEatFood(megaFoodData);
+            Assert(cosMgrEco.Inventory.Coins == coinsBeforeMegaFood + 15, "Eating Mega Food (Astral Core) awarded +15 bonus coins immediately to CosmeticInventory");
+
+            // 5. Match End Victory & Ranking Coin Bonuses
+            // Victory (Rank 1): 150 + (2 kills * 25) + (30s / 15 * 5) = 150 + 50 + 10 = 210
+            int match1Coins = GameManager.CalculateMatchCoins(1, 2, 30f);
+            Assert(match1Coins == 210, "Rank 1 Match Victory with 2 AI kills and 30s survival calculated 210 coins");
+
+            // Top 3 (Rank 2): 75 + (1 kill * 25) + (20s / 15 * 5) = 75 + 25 + 5 = 105
+            int match2Coins = GameManager.CalculateMatchCoins(2, 1, 20f);
+            Assert(match2Coins == 105, "Rank 2 Podium placement calculated 105 coins");
+
+            // Top 5 (Rank 5): 30 + (0 kills * 25) + (10s / 15 * 5) = 30 + 0 + 0 = 30
+            int match3Coins = GameManager.CalculateMatchCoins(5, 0, 10f);
+            Assert(match3Coins == 30, "Rank 5 placement calculated 30 coins");
+
+            // Unplaced (Rank 7): 0 + (3 kills * 25) + (45s / 15 * 5) = 0 + 75 + 15 = 90
+            int match4Coins = GameManager.CalculateMatchCoins(7, 3, 45f);
+            Assert(match4Coins == 90, "Unplaced match calculated kill and survival coins (90 coins)");
+
+            // 6. Persistence Roundtrip for Rewards & Quests
+            SaveData v2RewardSave = new SaveData();
+            v2RewardSave.LastDailyClaimDate = System.DateTime.UtcNow.ToString("yyyy-MM-dd");
+            v2RewardSave.DailyStreak = 5;
+            v2RewardSave.LastQuestDate = System.DateTime.UtcNow.ToString("yyyy-MM-dd");
+            v2RewardSave.ActiveQuests = new List<QuestProgress>(questMgr.ActiveQuests);
+            v2RewardSave.Coins = 3500;
+
+            string rewardJson = JsonUtility.ToJson(v2RewardSave);
+            SaveData loadedRewardSave = JsonUtility.FromJson<SaveData>(rewardJson);
+            Assert(loadedRewardSave.DailyStreak == 5, "SaveData persisted daily reward streak");
+            Assert(loadedRewardSave.ActiveQuests != null && loadedRewardSave.ActiveQuests.Count == 4, "SaveData persisted daily active quests state and progress");
+            Assert(loadedRewardSave.Coins == 3500, "SaveData persisted total coins balance");
+
+            // Cleanup Rewards test objects
+            Object.DestroyImmediate(testEcoPlayerGo);
+            Object.DestroyImmediate(testQuestGo);
+            Object.DestroyImmediate(testDailyGo);
+            Object.DestroyImmediate(cosMgrTestGo);
 
             Debug.Log("=== [GigaGrub Verification Tests] ALL TESTS PASSED! ===");
         }

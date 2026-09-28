@@ -29,6 +29,15 @@ namespace GigaGrub.UI
         [Tooltip("Interactive touch button placeholder for speed boost")]
         [SerializeField] private Button boostButton;
 
+        [Tooltip("Mobile hold-to-boost button component")]
+        [SerializeField] private HoldButton holdBoostButton;
+
+        [Tooltip("Boost energy meter display gauge")]
+        [SerializeField] private BoostEnergyBarUI boostEnergyBar;
+
+        [Tooltip("Active power-up badges HUD display container")]
+        [SerializeField] private ActivePowerUpHUD activePowerUpHUD;
+
         [Header("Animation Settings")]
         [Tooltip("Scale punch magnitude when score increases")]
         [SerializeField] private float punchScale = 1.18f;
@@ -38,6 +47,9 @@ namespace GigaGrub.UI
 
         private PlayerBody targetPlayer;
         private GrowthSystem targetGrowth;
+        private BoostSystem targetBoost;
+        private PlayerController targetController;
+        private PowerUps.PowerUpManager targetPowerUps;
         private Transform scoreTransform;
         private Vector3 originalScoreScale = Vector3.one;
         private Coroutine timerCoroutine;
@@ -69,9 +81,27 @@ namespace GigaGrub.UI
                 targetPlayer = FindAnyObjectByType<PlayerBody>();
             }
 
-            if (targetPlayer != null && targetGrowth == null)
+            if (targetPlayer != null)
             {
-                targetGrowth = targetPlayer.GetComponent<GrowthSystem>();
+                if (targetGrowth == null) targetGrowth = targetPlayer.GetComponent<GrowthSystem>();
+                if (targetBoost == null) targetBoost = targetPlayer.GetComponent<BoostSystem>();
+                if (targetController == null) targetController = targetPlayer.GetComponent<PlayerController>();
+                if (targetPowerUps == null) targetPowerUps = targetPlayer.GetComponent<PowerUps.PowerUpManager>();
+
+                if (boostEnergyBar != null && targetBoost != null)
+                {
+                    boostEnergyBar.BindBoostSystem(targetBoost);
+                }
+
+                if (targetController != null && holdBoostButton != null)
+                {
+                    targetController.BindBoostButton(holdBoostButton);
+                }
+
+                if (activePowerUpHUD != null && targetPowerUps != null)
+                {
+                    activePowerUpHUD.BindManager(targetPowerUps);
+                }
             }
 
             SubscribeEvents();
@@ -111,6 +141,24 @@ namespace GigaGrub.UI
 
             targetPlayer = player;
             targetGrowth = growth != null ? growth : (player != null ? player.GetComponent<GrowthSystem>() : null);
+            targetBoost = player != null ? player.GetComponent<BoostSystem>() : null;
+            targetController = player != null ? player.GetComponent<PlayerController>() : null;
+            targetPowerUps = player != null ? player.GetComponent<PowerUps.PowerUpManager>() : null;
+
+            if (boostEnergyBar != null && targetBoost != null)
+            {
+                boostEnergyBar.BindBoostSystem(targetBoost);
+            }
+
+            if (targetController != null && holdBoostButton != null)
+            {
+                targetController.BindBoostButton(holdBoostButton);
+            }
+
+            if (activePowerUpHUD != null && targetPowerUps != null)
+            {
+                activePowerUpHUD.BindManager(targetPowerUps);
+            }
 
             SubscribeEvents();
             RefreshAllDisplays();

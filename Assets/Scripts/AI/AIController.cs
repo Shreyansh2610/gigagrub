@@ -24,6 +24,7 @@ namespace GigaGrub.AI
         [SerializeField] private AIStateMachine stateMachine;
         [SerializeField] private AIWorldDetector worldDetector;
         [SerializeField] private PlayerBody creatureBody;
+        [SerializeField] private BoostSystem boostSystem;
 
         private float decisionTimer = 0f;
         private float currentSpeed;
@@ -33,6 +34,7 @@ namespace GigaGrub.AI
         public float DecisionInterval => decisionInterval;
         public AIStateMachine StateMachine => stateMachine;
         public PlayerBody CreatureBody => creatureBody;
+        public BoostSystem Boost => boostSystem;
         public int CurrentScore => creatureBody != null ? creatureBody.CurrentScore : 0;
         public int CurrentLength => creatureBody != null ? creatureBody.CurrentLength : 0;
 
@@ -61,6 +63,11 @@ namespace GigaGrub.AI
                 creatureBody = GetComponent<PlayerBody>();
             }
 
+            if (boostSystem == null)
+            {
+                boostSystem = GetComponent<BoostSystem>();
+            }
+
             currentSpeed = moveSpeed;
 
             // Stagger decision timers across AI instances to eliminate CPU spikes
@@ -84,8 +91,23 @@ namespace GigaGrub.AI
                 if (stateMachine != null)
                 {
                     stateMachine.EvaluateState(transform.position, transform.up);
+                    UpdateAIBoostIntent();
                 }
             }
+        }
+
+        private void UpdateAIBoostIntent()
+        {
+            if (boostSystem == null || stateMachine == null) return;
+
+            // AI boosts when escaping imminent creature collision or rushing to big food
+            bool shouldBoost = false;
+            if (stateMachine.CurrentState == AIStateType.AvoidCreature && boostSystem.CurrentEnergy > 30f)
+            {
+                shouldBoost = true;
+            }
+
+            boostSystem.SetBoostIntent(shouldBoost);
         }
 
         private void HandleSteering()
@@ -108,6 +130,10 @@ namespace GigaGrub.AI
 
         private void HandleMovement()
         {
+            float targetSpeed = boostSystem != null ? boostSystem.TargetSpeed : moveSpeed;
+            float accelRate = (boostSystem != null && boostSystem.IsBoosting) ? 18f : 10f;
+            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, Time.deltaTime * accelRate);
+
             transform.position += transform.up * (currentSpeed * Time.deltaTime);
         }
 

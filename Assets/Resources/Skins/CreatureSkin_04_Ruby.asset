@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7cfd7cd4f4754fb479d688c1b3924a69, type: 3}
+  m_Name: CreatureSkin_04_Ruby
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Data.CreatureSkinData
+  skinId: skin_04_ruby
+  skinName: Ruby
+  headSprite: {fileID: 21300000, guid: a41d86df2fff9c040a37944e215b082e, type: 3}
+  segmentSprite: {fileID: 21300000, guid: bc2bab409f9a3034db1b2f10640845b4, type: 3}
+  primaryColor: {r: 1, g: 0.22, b: 0.38, a: 1}
+  secondaryColor: {r: 0.68, g: 0.08, b: 0.2, a: 1}
+  accentColor: {r: 1, g: 0.65, b: 0.75, a: 1}

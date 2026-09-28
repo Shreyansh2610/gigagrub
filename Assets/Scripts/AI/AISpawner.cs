@@ -23,6 +23,10 @@ namespace GigaGrub.AI
         [Tooltip("Parent transform for spawned AI creatures to keep hierarchy clean")]
         [SerializeField] private Transform aiParent;
 
+        [Header("Skin Configurations")]
+        [Tooltip("Available creature skin variations for AI bots")]
+        [SerializeField] private GigaGrub.Data.CreatureSkinData[] botSkins;
+
         private readonly List<AIController> activeAICreatures = new List<AIController>();
 
         // Distinct vibrant color palettes for AI creatures
@@ -42,6 +46,7 @@ namespace GigaGrub.AI
 
         public int ActiveAICount => activeAICreatures.Count;
         public IReadOnlyList<AIController> ActiveAICreatures => activeAICreatures;
+        public GigaGrub.Data.CreatureSkinData[] BotSkins => botSkins;
 
         private void Awake()
         {
@@ -74,6 +79,11 @@ namespace GigaGrub.AI
             targetAICount = Mathf.Max(0, count);
         }
 
+        public void SetSkins(GigaGrub.Data.CreatureSkinData[] skins)
+        {
+            botSkins = skins;
+        }
+
         public void SpawnAICreatures(int count)
         {
             if (aiCreaturePrefab == null) return;
@@ -101,11 +111,24 @@ namespace GigaGrub.AI
 
             if (body != null)
             {
-                Color themeColor = HeadColors[index % HeadColors.Length];
-                Color bodyColor = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 1f);
-                body.SetColor(themeColor, bodyColor);
                 body.SetIsPlayer(false);
                 body.InitializeRuntime();
+
+                if (GigaGrub.Cosmetics.CosmeticManager.Instance != null)
+                {
+                    GigaGrub.Cosmetics.CosmeticManager.Instance.ApplyRandomCosmeticsToAI(body);
+                }
+                else if (botSkins != null && botSkins.Length > 0)
+                {
+                    var skin = botSkins[index % botSkins.Length];
+                    body.SetSkin(skin);
+                }
+                else
+                {
+                    Color themeColor = HeadColors[index % HeadColors.Length];
+                    Color bodyColor = new Color(themeColor.r * 0.85f, themeColor.g * 0.85f, themeColor.b * 0.85f, 1f);
+                    body.SetColor(themeColor, bodyColor);
+                }
 
                 if (RankingManager.Instance != null)
                 {

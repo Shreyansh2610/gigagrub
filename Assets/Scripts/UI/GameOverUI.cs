@@ -25,6 +25,12 @@ namespace GigaGrub.UI
         [Tooltip("Text component to display total food items collected")]
         [SerializeField] private Text foodCollectedText;
 
+        [Tooltip("Text component to display coins earned in the match")]
+        [SerializeField] private Text coinsEarnedText;
+
+        [Tooltip("Text component to display final rank placement")]
+        [SerializeField] private Text rankPlacementText;
+
         [Header("Buttons")]
         [Tooltip("Button to restart the match")]
         [SerializeField] private Button restartButton;
@@ -111,7 +117,7 @@ namespace GigaGrub.UI
             }
         }
 
-        public void Show(GameStats stats)
+        public void Show(GameStats stats, int coinsEarned = 0, int finalRank = 0)
         {
             targetFinalScore = stats.FinalScore;
             animatedScore = 0f;
@@ -153,6 +159,16 @@ namespace GigaGrub.UI
             if (foodCollectedText != null)
             {
                 foodCollectedText.text = $"{stats.FoodCollected}";
+            }
+
+            if (coinsEarnedText != null)
+            {
+                coinsEarnedText.text = $"+{coinsEarned:N0} COINS";
+            }
+
+            if (rankPlacementText != null)
+            {
+                rankPlacementText.text = finalRank > 0 ? $"RANK #{finalRank}" : "";
             }
 
             if (rootPanel != null)

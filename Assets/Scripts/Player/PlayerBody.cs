@@ -33,12 +33,13 @@ namespace GigaGrub.Player
         [Tooltip("Speed at which newly added segments scale in")]
         [SerializeField] private float smoothGrowthSpeed = 8f;
 
-        [Header("Visuals")]
+        [Header("Visuals & Skin")]
         [SerializeField] private bool enableTaper = true;
         [SerializeField] private float minTailScale = 0.65f;
         [SerializeField] private int headSortingOrder = 100;
         [SerializeField] private Color headTintColor = Color.white;
         [SerializeField] private Color bodyTintColor = Color.white;
+        [SerializeField] private Sprite customSegmentSprite;
 
         [Header("Feedback Effects")]
         [SerializeField] private bool enableAudioFeedback = true;
@@ -86,6 +87,7 @@ namespace GigaGrub.Player
         public float SegmentSpacing => segmentSpacing;
         public int GrowthMultiplier => growthMultiplier;
         public IReadOnlyList<PlayerSegment> ActiveSegments => activeSegments;
+        public IReadOnlyList<PlayerSegment> Segments => activeSegments;
         public int CurrentScore => isPlayer && ScoreManager.Instance != null ? ScoreManager.Instance.CurrentScore : currentScore;
         public GrowthSystem GrowthSystem => growthSystem;
         public CreatureCollision Collision => creatureCollision;
@@ -107,8 +109,13 @@ namespace GigaGrub.Player
             }
         }
 
-        public void InitializeRuntime()
+        public void InitializeRuntime(GameObject customSegmentPrefab = null)
         {
+            if (customSegmentPrefab != null)
+            {
+                segmentPrefab = customSegmentPrefab;
+            }
+
             if (headTransform == null)
             {
                 headTransform = transform;
@@ -186,6 +193,11 @@ namespace GigaGrub.Player
 
             UpdateSegments();
             isInitialized = true;
+
+            if (isPlayer && GigaGrub.Cosmetics.CosmeticManager.Instance != null)
+            {
+                GigaGrub.Cosmetics.CosmeticManager.Instance.ApplyToPlayer(this);
+            }
 
             if (RankingManager.Instance != null)
             {
@@ -499,6 +511,10 @@ namespace GigaGrub.Player
             }
 
             newSegment.OnSpawnFromPool(this, spawnPos, spawnRot, order, scaleMultiplier, smoothScaleIn, smoothGrowthSpeed);
+            if (customSegmentSprite != null)
+            {
+                newSegment.SetSprite(customSegmentSprite);
+            }
             if (bodyTintColor != Color.white)
             {
                 newSegment.SetColor(bodyTintColor);
@@ -509,6 +525,13 @@ namespace GigaGrub.Player
             if (enableTaper && smoothScaleIn)
             {
                 RefreshSegmentTaper();
+            }
+
+            // Refresh modular cosmetics across all segments
+            GigaGrub.Cosmetics.CreatureCosmeticController cosmeticCtrl = GetComponent<GigaGrub.Cosmetics.CreatureCosmeticController>();
+            if (cosmeticCtrl != null)
+            {
+                cosmeticCtrl.RefreshAllSegmentCosmetics();
             }
 
             // Ensure trail has enough pre-buffered capacity for new length
@@ -635,6 +658,24 @@ namespace GigaGrub.Player
                     cam.TriggerShake(shakeMag, 0.12f);
                 }
             }
+
+            // 7. Coin Reward for Mega Food & Daily Quest Hook (Player only)
+            if (isPlayer)
+            {
+                if (foodData.FoodType == FoodType.Mega)
+                {
+                    if (GigaGrub.Cosmetics.CosmeticManager.Instance != null && GigaGrub.Cosmetics.CosmeticManager.Instance.Inventory != null)
+                    {
+                        GigaGrub.Cosmetics.CosmeticManager.Instance.Inventory.AddCoins(15);
+                    }
+                }
+
+                if (GigaGrub.Rewards.QuestManager.Instance != null)
+                {
+                    GigaGrub.Rewards.QuestManager.Instance.ReportFoodEaten(foodData);
+                    GigaGrub.Rewards.QuestManager.Instance.ReportLengthReached(activeSegments.Count);
+                }
+            }
         }
 
         private void UpdateHeadPunch()
@@ -717,6 +758,51 @@ namespace GigaGrub.Player
             {
                 RankingManager.Instance.RegisterCreature(this);
             }
+
+            // 10. Re-apply equipped player cosmetics
+            if (isPlayer && GigaGrub.Cosmetics.CosmeticManager.Instance != null)
+            {
+                GigaGrub.Cosmetics.CosmeticManager.Instance.ApplyToPlayer(this);
+            }
+        }
+
+        public void SetSkin(Sprite headSprite, Sprite segmentSprite, Color headColor, Color bodyColor)
+        {
+            customSegmentSprite = segmentSprite;
+            headTintColor = headColor;
+            bodyTintColor = bodyColor;
+
+            if (headSpriteRenderer == null)
+            {
+                headSpriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (headSpriteRenderer != null)
+            {
+                if (headSprite != null)
+                {
+                    headSpriteRenderer.sprite = headSprite;
+                }
+                headSpriteRenderer.color = headColor;
+            }
+
+            for (int i = 0; i < activeSegments.Count; i++)
+            {
+                if (activeSegments[i] != null)
+                {
+                    if (segmentSprite != null)
+                    {
+                        activeSegments[i].SetSprite(segmentSprite);
+                    }
+                    activeSegments[i].SetColor(bodyColor);
+                }
+            }
+        }
+
+        public void SetSkin(GigaGrub.Data.CreatureSkinData skin)
+        {
+            if (skin == null) return;
+            SetSkin(skin.HeadSprite, skin.SegmentSprite, skin.PrimaryColor, skin.SecondaryColor);
         }
 
         private void OnDestroy()

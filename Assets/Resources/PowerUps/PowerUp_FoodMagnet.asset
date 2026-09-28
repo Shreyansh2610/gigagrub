@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e988f9c655af2142bbfc2afb641f13e, type: 3}
+  m_Name: PowerUp_FoodMagnet
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.PowerUps.PowerUpData
+  id: food_magnet
+  powerUpName: Food Magnet
+  powerUpType: 1
+  duration: 10
+  effectStrength: 6
+  spawnWeight: 35
+  themeColor: {r: 0.95, g: 0.2, b: 0.85, a: 1}
+  iconSprite: {fileID: 21300000, guid: 23142a2267700284d9611e1218a392fd, type: 3}
+  enablePulsing: 1
+  pulseSpeed: 4.5
+  pulseMagnitude: 0.18

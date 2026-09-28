@@ -107,6 +107,41 @@ namespace GigaGrub.Core
             {
                 survivalTimer += Time.deltaTime;
             }
+
+            // Android hardware back button / Escape key handling
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (currentState == GameState.Playing)
+                {
+                    PauseGame();
+                }
+                else if (currentState == GameState.Paused)
+                {
+                    ResumeGame();
+                }
+                else if (currentState == GameState.GameOver)
+                {
+                    ReturnToMainMenu();
+                }
+            }
+        }
+
+        private void OnApplicationPause(bool pauseStatus)
+        {
+            // Auto-pause when app is backgrounded on mobile
+            if (pauseStatus && currentState == GameState.Playing)
+            {
+                PauseGame();
+            }
+        }
+
+        private void OnApplicationFocus(bool hasFocus)
+        {
+            // Auto-pause when app loses focus on mobile
+            if (!hasFocus && currentState == GameState.Playing)
+            {
+                PauseGame();
+            }
         }
 
         private void OnDestroy()
@@ -240,6 +275,10 @@ namespace GigaGrub.Core
             if (currentState == GameState.Playing)
             {
                 aiCreaturesDefeated++;
+                if (GigaGrub.Rewards.QuestManager.Instance != null)
+                {
+                    GigaGrub.Rewards.QuestManager.Instance.ReportAIDefeated(1);
+                }
             }
         }
 
@@ -261,6 +300,23 @@ namespace GigaGrub.Core
                 FoodCollected = foodCollected
             };
 
+            // Calculate Match Coin Earnings
+            int playerRank = rankingManager != null ? rankingManager.CurrentRank : 1;
+            int totalMatchCoins = CalculateMatchCoins(playerRank, aiCreaturesDefeated, survivalTimer);
+
+            // Award match coins directly to CosmeticInventory
+            if (GigaGrub.Cosmetics.CosmeticManager.Instance != null && GigaGrub.Cosmetics.CosmeticManager.Instance.Inventory != null)
+            {
+                GigaGrub.Cosmetics.CosmeticManager.Instance.Inventory.AddCoins(totalMatchCoins);
+                GigaGrub.Cosmetics.CosmeticManager.Instance.SaveToSaveManager();
+            }
+
+            // Report Match Outcome to QuestManager
+            if (GigaGrub.Rewards.QuestManager.Instance != null)
+            {
+                GigaGrub.Rewards.QuestManager.Instance.ReportMatchFinished(playerRank);
+            }
+
             // Persist session stats to SaveManager
             if (SaveManager.Instance != null)
             {
@@ -274,7 +330,7 @@ namespace GigaGrub.Core
 
             if (gameOverUI != null)
             {
-                gameOverUI.Show(lastStats);
+                gameOverUI.Show(lastStats, totalMatchCoins, playerRank);
             }
 
             OnGameStateChanged?.Invoke(currentState);
@@ -374,6 +430,14 @@ namespace GigaGrub.Core
                     RestartGame();
                 }
             }
+        }
+
+        public static int CalculateMatchCoins(int playerRank, int aiKills, float survivalSeconds)
+        {
+            int rankBonus = playerRank == 1 ? 150 : (playerRank <= 3 ? 75 : (playerRank <= 5 ? 30 : 0));
+            int killCoins = aiKills * 25;
+            int survivalCoins = Mathf.FloorToInt(survivalSeconds / 15f) * 5;
+            return rankBonus + killCoins + survivalCoins;
         }
     }
 }

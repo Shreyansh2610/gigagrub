@@ -101,6 +101,19 @@ namespace GigaGrub.Player
             }
         }
 
+        public void SetSprite(Sprite sprite)
+        {
+            if (spriteRenderer == null)
+            {
+                spriteRenderer = GetComponent<SpriteRenderer>();
+            }
+
+            if (spriteRenderer != null && sprite != null)
+            {
+                spriteRenderer.sprite = sprite;
+            }
+        }
+
         public void SetScaleMultiplier(float multiplier, bool immediate = false, float speed = 8f)
         {
             targetScale = Vector3.one * multiplier;

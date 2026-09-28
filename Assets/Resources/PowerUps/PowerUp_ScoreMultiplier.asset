@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5e988f9c655af2142bbfc2afb641f13e, type: 3}
+  m_Name: PowerUp_ScoreMultiplier
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.PowerUps.PowerUpData
+  id: score_multiplier
+  powerUpName: 2x Score
+  powerUpType: 2
+  duration: 12
+  effectStrength: 2
+  spawnWeight: 30
+  themeColor: {r: 1, g: 0.85, b: 0.15, a: 1}
+  iconSprite: {fileID: 21300000, guid: 90a79f389d708984899a5b514c1d7937, type: 3}
+  enablePulsing: 1
+  pulseSpeed: 4
+  pulseMagnitude: 0.12

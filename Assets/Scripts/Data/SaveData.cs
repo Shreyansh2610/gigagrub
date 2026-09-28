@@ -1,12 +1,14 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using GigaGrub.Cosmetics;
 
 namespace GigaGrub.Data
 {
     [Serializable]
     public class SaveData
     {
-        public const int CurrentSaveVersion = 1;
+        public const int CurrentSaveVersion = 2;
 
         [SerializeField] private int version = CurrentSaveVersion;
         [SerializeField] private long timestamp = 0;
@@ -22,6 +24,17 @@ namespace GigaGrub.Data
         [SerializeField] private float musicVolume = 0.8f;
         [SerializeField] private float sfxVolume = 0.8f;
         [SerializeField] private bool vibrationEnabled = true;
+
+        [Header("Cosmetics & Economy")]
+        [SerializeField] private int coins = 1000;
+        [SerializeField] private List<string> unlockedCosmetics = new List<string>();
+        [SerializeField] private EquippedCosmetics equippedCosmetics = EquippedCosmetics.CreateDefault();
+
+        [Header("Daily Rewards & Quests")]
+        [SerializeField] private string lastDailyClaimDate = "";
+        [SerializeField] private int dailyStreak = 1;
+        [SerializeField] private string lastQuestDate = "";
+        [SerializeField] private List<GigaGrub.Rewards.QuestProgress> activeQuests = new List<GigaGrub.Rewards.QuestProgress>();
 
         public int Version
         {
@@ -83,6 +96,75 @@ namespace GigaGrub.Data
             set => vibrationEnabled = value;
         }
 
+        public int Coins
+        {
+            get => coins;
+            set => coins = Mathf.Max(0, value);
+        }
+
+        public List<string> UnlockedCosmetics
+        {
+            get
+            {
+                if (unlockedCosmetics == null)
+                {
+                    unlockedCosmetics = new List<string>();
+                }
+                return unlockedCosmetics;
+            }
+            set => unlockedCosmetics = value ?? new List<string>();
+        }
+
+        public EquippedCosmetics EquippedCosmetics
+        {
+            get
+            {
+                if (equippedCosmetics == null)
+                {
+                    equippedCosmetics = EquippedCosmetics.CreateDefault();
+                }
+                return equippedCosmetics;
+            }
+            set => equippedCosmetics = value ?? EquippedCosmetics.CreateDefault();
+        }
+
+        public EquippedCosmetics Equipped
+        {
+            get => EquippedCosmetics;
+            set => EquippedCosmetics = value;
+        }
+
+        public string LastDailyClaimDate
+        {
+            get => lastDailyClaimDate ?? "";
+            set => lastDailyClaimDate = value ?? "";
+        }
+
+        public int DailyStreak
+        {
+            get => Mathf.Clamp(dailyStreak, 1, 7);
+            set => dailyStreak = Mathf.Clamp(value, 1, 7);
+        }
+
+        public string LastQuestDate
+        {
+            get => lastQuestDate ?? "";
+            set => lastQuestDate = value ?? "";
+        }
+
+        public List<GigaGrub.Rewards.QuestProgress> ActiveQuests
+        {
+            get
+            {
+                if (activeQuests == null)
+                {
+                    activeQuests = new List<GigaGrub.Rewards.QuestProgress>();
+                }
+                return activeQuests;
+            }
+            set => activeQuests = value ?? new List<GigaGrub.Rewards.QuestProgress>();
+        }
+
         public static SaveData CreateDefault()
         {
             return new SaveData
@@ -96,7 +178,14 @@ namespace GigaGrub.Data
                 totalAIDefeated = 0,
                 musicVolume = 0.8f,
                 sfxVolume = 0.8f,
-                vibrationEnabled = true
+                vibrationEnabled = true,
+                coins = 1000,
+                unlockedCosmetics = new List<string>(),
+                equippedCosmetics = EquippedCosmetics.CreateDefault(),
+                lastDailyClaimDate = "",
+                dailyStreak = 1,
+                lastQuestDate = "",
+                activeQuests = new List<GigaGrub.Rewards.QuestProgress>()
             };
         }
 
@@ -149,6 +238,31 @@ namespace GigaGrub.Data
             if (sfxVolume < 0f || sfxVolume > 1f)
             {
                 sfxVolume = Mathf.Clamp01(sfxVolume);
+                wasModified = true;
+            }
+
+            if (coins < 0)
+            {
+                coins = 0;
+                wasModified = true;
+            }
+
+            if (unlockedCosmetics == null)
+            {
+                unlockedCosmetics = new List<string>();
+                wasModified = true;
+            }
+
+            if (equippedCosmetics == null)
+            {
+                equippedCosmetics = EquippedCosmetics.CreateDefault();
+                wasModified = true;
+            }
+
+            // Version 1 -> Version 2 migration
+            if (version < CurrentSaveVersion)
+            {
+                version = CurrentSaveVersion;
                 wasModified = true;
             }
 

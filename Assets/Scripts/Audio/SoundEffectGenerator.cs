@@ -6,6 +6,7 @@ namespace GigaGrub.Audio
     {
         private static AudioClip cachedEatClip;
         private static AudioClip cachedDeathClip;
+        private static AudioClip cachedBoostClip;
 
         public static AudioClip GetOrCreateEatSoundClip()
         {
@@ -98,5 +99,38 @@ namespace GigaGrub.Audio
                 source.PlayOneShot(clip, volume);
             }
         }
+
+        public static AudioClip GetOrCreateBoostLoopClip()
+        {
+            if (cachedBoostClip != null) return cachedBoostClip;
+
+            // Generate a 0.6s seamless looping wind rush and energy hum
+            int sampleRate = 44100;
+            float duration = 0.6f;
+            int totalSamples = Mathf.CeilToInt(sampleRate * duration);
+            float[] samples = new float[totalSamples];
+
+            for (int i = 0; i < totalSamples; i++)
+            {
+                float t = (float)i / totalSamples;
+                float angle = t * 2f * Mathf.PI;
+
+                // Seamless periodic noise/oscillator blend
+                float fundamental = Mathf.Sin(angle * 12f) * 0.35f; // ~120 Hz hum
+                float sub = Mathf.Sin(angle * 6f) * 0.25f;          // ~60 Hz rumble
+                float overtone = Mathf.Sin(angle * 24f) * 0.15f;    // ~240 Hz rush
+
+                // Pseudo-random periodic wind texture
+                float windPhase = Mathf.Sin(angle * 48f) * Mathf.Cos(angle * 18f);
+                float sample = fundamental + sub + overtone + windPhase * 0.25f;
+
+                samples[i] = Mathf.Clamp(sample * 0.5f, -1f, 1f);
+            }
+
+            cachedBoostClip = AudioClip.Create("BoostLoopSound", totalSamples, 1, sampleRate, false);
+            cachedBoostClip.SetData(samples, 0);
+            return cachedBoostClip;
+        }
     }
 }
+

@@ -62,6 +62,7 @@ namespace GigaGrub.Food
         public int ActiveFoodCount => activeFoods.Count;
         public int TotalPoolCount => pool.Count + activeFoods.Count;
         public IReadOnlyList<Food> ActiveFoods => activeFoods;
+        public IReadOnlyList<Food> ActiveFood => activeFoods;
         public SpatialGrid2D<Food> SpatialGrid => spatialGrid;
 
         public static void SetInstanceForTest(FoodSpawner spawner)

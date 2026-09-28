@@ -23,12 +23,28 @@ namespace GigaGrub.Player
         [Tooltip("Reference to the on-screen virtual joystick")]
         public VirtualJoystick joystick;
 
+        [Tooltip("Reference to the on-screen mobile hold boost button")]
+        public HoldButton boostButton;
+
+        [Tooltip("Reference to the creature boost energy system")]
+        [SerializeField] private BoostSystem boostSystem;
+
+        [Tooltip("Reference to active power-up manager")]
+        [SerializeField] private PowerUps.PowerUpManager powerUpManager;
+
+        [Header("Audio")]
+        [SerializeField] private AudioSource boostAudioSource;
+        [SerializeField] private float maxBoostAudioVolume = 0.55f;
+
         private float currentSpeed;
         private float targetSpeed;
         private Quaternion targetRotation;
 
         public float CurrentSpeed => currentSpeed;
         public float BaseSpeed => moveSpeed;
+        public BoostSystem Boost => boostSystem;
+        public PowerUps.PowerUpManager PowerUps => powerUpManager;
+        public bool IsBoosting => boostSystem != null && boostSystem.IsBoosting;
 
         private void Awake()
         {
@@ -37,13 +53,64 @@ namespace GigaGrub.Player
             currentSpeed = moveSpeed;
             targetSpeed = moveSpeed;
             targetRotation = transform.rotation;
+
+            if (boostSystem == null)
+            {
+                boostSystem = GetComponent<BoostSystem>();
+            }
+
+            if (powerUpManager == null)
+            {
+                powerUpManager = GetComponent<PowerUps.PowerUpManager>();
+            }
+
+            SetupBoostAudio();
+        }
+
+        private void SetupBoostAudio()
+        {
+            if (boostAudioSource == null)
+            {
+                boostAudioSource = gameObject.AddComponent<AudioSource>();
+                boostAudioSource.playOnAwake = false;
+                boostAudioSource.loop = true;
+                boostAudioSource.spatialBlend = 0f;
+                boostAudioSource.clip = Audio.SoundEffectGenerator.GetOrCreateBoostLoopClip();
+                boostAudioSource.volume = 0f;
+            }
         }
 
         private void Update()
         {
+            HandleBoostInput();
             HandleSteering();
             HandleMovement();
+            HandleBoostAudio();
             ApplyBoundaryConstraint();
+        }
+
+        private void HandleBoostInput()
+        {
+            bool wantsBoost = false;
+
+            if (boostButton != null && boostButton.IsPressed)
+            {
+                wantsBoost = true;
+            }
+            else if (Input.GetKey(KeyCode.Space) || Input.GetKey(KeyCode.LeftShift) || Input.GetMouseButton(1))
+            {
+                wantsBoost = true;
+            }
+
+            float baseTarget = moveSpeed;
+            if (boostSystem != null)
+            {
+                boostSystem.SetBoostIntent(wantsBoost);
+                baseTarget = boostSystem.TargetSpeed;
+            }
+
+            float bonusSpeed = powerUpManager != null ? powerUpManager.SpeedBonus : 0f;
+            targetSpeed = baseTarget + bonusSpeed;
         }
 
         private void HandleSteering()
@@ -88,10 +155,41 @@ namespace GigaGrub.Player
 
         private void HandleMovement()
         {
-            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, Time.deltaTime * 12f);
+            float accelRate = IsBoosting ? 20f : 12f;
+            currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, Time.deltaTime * accelRate);
 
             // Continuous forward movement in the direction the creature is facing
             transform.position += transform.up * (currentSpeed * Time.deltaTime);
+        }
+
+        private void HandleBoostAudio()
+        {
+            if (boostAudioSource == null) return;
+
+            float sfxVol = Systems.SaveManager.Instance != null && Systems.SaveManager.Instance.Statistics != null
+                ? Systems.SaveManager.Instance.Statistics.SFXVolume
+                : 1f;
+
+            float targetVol = IsBoosting ? (maxBoostAudioVolume * sfxVol) : 0f;
+
+            if (IsBoosting)
+            {
+                if (!boostAudioSource.isPlaying)
+                {
+                    boostAudioSource.Play();
+                }
+                boostAudioSource.volume = Mathf.MoveTowards(boostAudioSource.volume, targetVol, Time.deltaTime * 6f);
+                boostAudioSource.pitch = Mathf.Lerp(boostAudioSource.pitch, 1.15f, Time.deltaTime * 5f);
+            }
+            else
+            {
+                boostAudioSource.volume = Mathf.MoveTowards(boostAudioSource.volume, 0f, Time.deltaTime * 8f);
+                boostAudioSource.pitch = Mathf.Lerp(boostAudioSource.pitch, 1.0f, Time.deltaTime * 5f);
+                if (boostAudioSource.volume <= 0.001f && boostAudioSource.isPlaying)
+                {
+                    boostAudioSource.Stop();
+                }
+            }
         }
 
         private void ApplyBoundaryConstraint()
@@ -103,6 +201,11 @@ namespace GigaGrub.Player
             }
         }
 
+        public void BindBoostButton(HoldButton button)
+        {
+            boostButton = button;
+        }
+
         public void SetSpeed(float newSpeed)
         {
             targetSpeed = Mathf.Max(0f, newSpeed);
@@ -110,7 +213,7 @@ namespace GigaGrub.Player
 
         public void ResetSpeed()
         {
-            targetSpeed = moveSpeed;
+            targetSpeed = boostSystem != null ? boostSystem.NormalSpeed : moveSpeed;
         }
     }
 }

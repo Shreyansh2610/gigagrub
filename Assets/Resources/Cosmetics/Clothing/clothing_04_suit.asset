@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: becf27cb2f6b46c458765bac6518b67c, type: 3}
+  m_Name: clothing_04_suit
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Cosmetics.ClothingData
+  id: clothing_04_suit
+  displayName: Suit
+  category: 3
+  rarity: 2
+  previewSprite: {fileID: 21300000, guid: 0e3b57e3095ce6e48881a53c96b38037, type: 3}
+  unlockType: 1
+  price: 450
+  unlockRequirement: 450 Coins
+  isDefaultUnlocked: 0
+  headCollarSprite: {fileID: 21300000, guid: 25c0dce26d6d19649a763e2b4249859a, type: 3}
+  segmentClothingSprite: {fileID: 21300000, guid: 0e3b57e3095ce6e48881a53c96b38037, type: 3}
+  maxSegmentsCovered: -1
+  tintWithSecondary: 1
+  customColor: {r: 1, g: 1, b: 1, a: 1}
+  sortingOffset: 2

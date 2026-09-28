@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7cfd7cd4f4754fb479d688c1b3924a69, type: 3}
+  m_Name: CreatureSkin_03_Spark
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Data.CreatureSkinData
+  skinId: skin_03_spark
+  skinName: Spark
+  headSprite: {fileID: 21300000, guid: adc01377a85dcfa47918b1f49da798cd, type: 3}
+  segmentSprite: {fileID: 21300000, guid: 6af5a9060a5a30e4aad19c807b6eca60, type: 3}
+  primaryColor: {r: 0.12, g: 0.88, b: 1, a: 1}
+  secondaryColor: {r: 0.02, g: 0.48, b: 0.75, a: 1}
+  accentColor: {r: 0.65, g: 0.95, b: 1, a: 1}

@@ -1,0 +1,34 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 75487b11ca4bf4043ab6c1b25e087cc9, type: 3}
+  m_Name: creature_02_slime
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Cosmetics.CreatureTypeData
+  id: creature_02_slime
+  displayName: Slime
+  category: 0
+  rarity: 1
+  previewSprite: {fileID: 21300000, guid: 96b1251ac7b99944c907cc4e787e5af6, type: 3}
+  unlockType: 1
+  price: 300
+  unlockRequirement: 300 Coins
+  isDefaultUnlocked: 0
+  headSprite: {fileID: 21300000, guid: 96b1251ac7b99944c907cc4e787e5af6, type: 3}
+  segmentSprite: {fileID: 21300000, guid: 2b879363609457b44a33dbc0351505a3, type: 3}
+  eyeDefaultSprite: {fileID: 0}
+  mouthDefaultSprite: {fileID: 0}
+  defaultPrimaryColor: {r: 0.2, g: 0.85, b: 1, a: 1}
+  defaultSecondaryColor: {r: 0.05, g: 0.55, b: 0.8, a: 1}
+  defaultAccentColor: {r: 0.7, g: 0.95, b: 1, a: 1}
+  headScale: {x: 1, y: 1, z: 1}
+  segmentScale: {x: 1, y: 1, z: 1}
+  segmentSpacing: 0.45
+  minTailScale: 0.65

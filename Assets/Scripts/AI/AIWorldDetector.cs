@@ -131,6 +131,16 @@ namespace GigaGrub.AI
                 Collider2D col = hitBuffer[i];
                 if (col == null) continue;
 
+                // Ignore food and power-up pickups
+                if (col.GetComponent<Food.Food>() != null || col.GetComponentInParent<Food.Food>() != null)
+                {
+                    continue;
+                }
+                if (col.GetComponent<PowerUps.PowerUpPickup>() != null || col.GetComponentInParent<PowerUps.PowerUpPickup>() != null)
+                {
+                    continue;
+                }
+
                 // Ignore own head collider
                 if (ownerTransform != null && (col.transform == ownerTransform || col.transform.IsChildOf(ownerTransform)))
                 {
@@ -151,6 +161,25 @@ namespace GigaGrub.AI
                         }
                     }
                     if (isOwnSegment) continue;
+                }
+
+                // Only consider it danger if it belongs to another creature
+                PlayerBody otherBody = col.GetComponent<PlayerBody>() ?? col.GetComponentInParent<PlayerBody>();
+                PlayerSegment otherSeg = col.GetComponent<PlayerSegment>() ?? col.GetComponentInParent<PlayerSegment>();
+                CreatureCollision otherCol = col.GetComponent<CreatureCollision>() ?? col.GetComponentInParent<CreatureCollision>();
+
+                if (otherBody == null && otherSeg == null && otherCol == null)
+                {
+                    continue;
+                }
+
+                if (otherBody == ownerBody && ownerBody != null)
+                {
+                    continue;
+                }
+                if (otherSeg != null && otherSeg.Owner == ownerBody && ownerBody != null)
+                {
+                    continue;
                 }
 
                 // Calculate repulsion vector inversely proportional to distance
@@ -188,8 +217,8 @@ namespace GigaGrub.AI
             }
 
             var spatialGrid = FoodSpawner.Instance.SpatialGrid;
-            IReadOnlyList<Food.Food> foodCandidates;
-            int count;
+            IReadOnlyList<Food.Food> foodCandidates = null;
+            int count = 0;
 
             if (spatialGrid != null)
             {
@@ -197,15 +226,18 @@ namespace GigaGrub.AI
                 foodCandidates = foodQueryBuffer;
                 count = foodQueryBuffer.Count;
             }
-            else
+
+            if (count == 0)
             {
                 var activeFoods = FoodSpawner.Instance.ActiveFoods;
-                if (activeFoods == null) return false;
-                foodCandidates = activeFoods;
-                count = activeFoods.Count;
+                if (activeFoods != null && activeFoods.Count > 0)
+                {
+                    foodCandidates = activeFoods;
+                    count = activeFoods.Count;
+                }
             }
 
-            if (count == 0) return false;
+            if (foodCandidates == null || count == 0) return false;
 
             float maxVisionSqr = foodVisionRadius * foodVisionRadius;
             float bestScore = float.MinValue;

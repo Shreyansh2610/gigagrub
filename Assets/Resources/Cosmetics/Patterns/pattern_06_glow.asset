@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 158d0f6ab77060a4ebb7803dc205ecc3, type: 3}
+  m_Name: pattern_06_glow
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Cosmetics.PatternData
+  id: pattern_06_glow
+  displayName: Bioluminescent Glow
+  category: 2
+  rarity: 3
+  previewSprite: {fileID: 21300000, guid: c810df4dd46634949b14f83da24efb6a, type: 3}
+  unlockType: 1
+  price: 750
+  unlockRequirement: 750 Coins
+  isDefaultUnlocked: 0
+  patternType: 5
+  patternSprite: {fileID: 21300000, guid: c810df4dd46634949b14f83da24efb6a, type: 3}
+  glowIntensity: 1.8
+  useSecondaryColor: 1
+  alternateSegments: 1

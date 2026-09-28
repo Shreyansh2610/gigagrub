@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: becf27cb2f6b46c458765bac6518b67c, type: 3}
+  m_Name: clothing_07_pirate
+  m_EditorClassIdentifier: Assembly-CSharp::GigaGrub.Cosmetics.ClothingData
+  id: clothing_07_pirate
+  displayName: Pirate
+  category: 3
+  rarity: 1
+  previewSprite: {fileID: 21300000, guid: ded03067b18a13d46b0a053643462e61, type: 3}
+  unlockType: 1
+  price: 300
+  unlockRequirement: 300 Coins
+  isDefaultUnlocked: 0
+  headCollarSprite: {fileID: 21300000, guid: 850081818c2f2d64886bc95af81c01c6, type: 3}
+  segmentClothingSprite: {fileID: 21300000, guid: ded03067b18a13d46b0a053643462e61, type: 3}
+  maxSegmentsCovered: 8
+  tintWithSecondary: 1
+  customColor: {r: 1, g: 1, b: 1, a: 1}
+  sortingOffset: 2

@@ -12,6 +12,13 @@ namespace GigaGrub.UI
         [Tooltip("Button to launch the game match")]
         [SerializeField] private Button playButton;
 
+        [Tooltip("Button to open creature customization modal")]
+        [SerializeField] private Button customizeButton;
+
+        [Tooltip("Button to open daily rewards and quests modal")]
+        [SerializeField] private Button rewardsButton;
+        [SerializeField] private GameObject rewardsBadge;
+
         [Tooltip("Button to open career statistics modal")]
         [SerializeField] private Button statisticsButton;
 
@@ -20,6 +27,19 @@ namespace GigaGrub.UI
 
         [Tooltip("Text displaying all-time best high score")]
         [SerializeField] private Text bestScoreText;
+
+        [Tooltip("Live creature preview on the main menu")]
+        [SerializeField] private GigaGrub.Cosmetics.CreaturePreviewStage mainMenuPreviewStage;
+
+        [Header("Rewards & Quests Modal Dialog")]
+        [SerializeField] private GameObject rewardsPanel;
+        [SerializeField] private CanvasGroup rewardsCanvasGroup;
+        [SerializeField] private GigaGrub.Rewards.DailyRewardsAndQuestsUI rewardsUI;
+
+        [Header("Customization Modal Dialog")]
+        [SerializeField] private GameObject customizationPanel;
+        [SerializeField] private CanvasGroup customizationCanvasGroup;
+        [SerializeField] private GigaGrub.UI.Customization.CustomizationUI customizationUI;
 
         [Header("Statistics Modal Dialog")]
         [SerializeField] private GameObject statisticsPanel;
@@ -47,22 +67,38 @@ namespace GigaGrub.UI
         private bool vibrationState = true;
         private bool isStatsOpen = false;
         private bool isSettingsOpen = false;
+        private bool isCustomizeOpen = false;
+        private bool isRewardsOpen = false;
 
         public bool IsStatsOpen => isStatsOpen;
         public bool IsSettingsOpen => isSettingsOpen;
+        public bool IsCustomizeOpen => isCustomizeOpen;
+        public bool IsRewardsOpen => isRewardsOpen;
 
         private void Update()
         {
             // Android hardware back button / Escape key handling
             if (Input.GetKeyDown(KeyCode.Escape))
             {
-                if (isSettingsOpen)
+                if (isRewardsOpen)
+                {
+                    CloseRewards();
+                }
+                else if (isCustomizeOpen)
+                {
+                    CloseCustomization();
+                }
+                else if (isSettingsOpen)
                 {
                     CloseSettings();
                 }
                 else if (isStatsOpen)
                 {
                     CloseStatistics();
+                }
+                else
+                {
+                    Application.Quit();
                 }
             }
         }
@@ -72,6 +108,16 @@ namespace GigaGrub.UI
             if (playButton != null)
             {
                 playButton.onClick.AddListener(OnPlayClicked);
+            }
+
+            if (customizeButton != null)
+            {
+                customizeButton.onClick.AddListener(OpenCustomization);
+            }
+
+            if (rewardsButton != null)
+            {
+                rewardsButton.onClick.AddListener(OpenRewards);
             }
 
             if (statisticsButton != null)
@@ -113,13 +159,17 @@ namespace GigaGrub.UI
         private void Start()
         {
             RefreshAllViews();
+            HideModalImmediate(rewardsPanel, rewardsCanvasGroup);
+            HideModalImmediate(customizationPanel, customizationCanvasGroup);
             HideModalImmediate(statisticsPanel, statisticsCanvasGroup);
             HideModalImmediate(settingsPanel, settingsCanvasGroup);
+            CheckRewardsNotificationBadge();
         }
 
         private void OnDestroy()
         {
             if (playButton != null) playButton.onClick.RemoveListener(OnPlayClicked);
+            if (customizeButton != null) customizeButton.onClick.RemoveListener(OpenCustomization);
             if (statisticsButton != null) statisticsButton.onClick.RemoveListener(OpenStatistics);
             if (settingsButton != null) settingsButton.onClick.RemoveListener(OpenSettings);
             if (statsCloseButton != null) statsCloseButton.onClick.RemoveListener(CloseStatistics);
@@ -127,6 +177,27 @@ namespace GigaGrub.UI
             if (musicVolumeSlider != null) musicVolumeSlider.onValueChanged.RemoveListener(OnMusicVolumeChanged);
             if (sfxVolumeSlider != null) sfxVolumeSlider.onValueChanged.RemoveListener(OnSFXVolumeChanged);
             if (vibrationToggleButton != null) vibrationToggleButton.onClick.RemoveListener(OnVibrationToggled);
+        }
+
+        public void OpenCustomization()
+        {
+            isCustomizeOpen = true;
+            if (customizationUI != null)
+            {
+                customizationUI.OpenCustomization();
+            }
+            ShowModal(customizationPanel, customizationCanvasGroup);
+        }
+
+        public void CloseCustomization()
+        {
+            isCustomizeOpen = false;
+            if (customizationUI != null)
+            {
+                customizationUI.OnCloseSaveClicked();
+            }
+            HideModal(customizationPanel, customizationCanvasGroup);
+            RefreshAllViews();
         }
 
         public void RefreshAllViews()
@@ -166,6 +237,42 @@ namespace GigaGrub.UI
             }
 
             UpdateVibrationUI();
+
+            // 3. Refresh Main Menu Live Creature Preview
+            if (mainMenuPreviewStage != null && GigaGrub.Cosmetics.CosmeticManager.Instance != null)
+            {
+                mainMenuPreviewStage.UpdatePreview(GigaGrub.Cosmetics.CosmeticManager.Instance.Inventory.Equipped);
+            }
+
+            CheckRewardsNotificationBadge();
+        }
+
+        public void CheckRewardsNotificationBadge()
+        {
+            bool hasDaily = GigaGrub.Rewards.DailyRewardManager.Instance != null && GigaGrub.Rewards.DailyRewardManager.Instance.IsRewardAvailable();
+            bool hasQuests = GigaGrub.Rewards.QuestManager.Instance != null && GigaGrub.Rewards.QuestManager.Instance.HasAnyClaimableRewards();
+
+            if (rewardsBadge != null)
+            {
+                rewardsBadge.SetActive(hasDaily || hasQuests);
+            }
+        }
+
+        public void OpenRewards()
+        {
+            isRewardsOpen = true;
+            if (rewardsUI != null)
+            {
+                rewardsUI.RefreshUI();
+            }
+            ShowModal(rewardsPanel, rewardsCanvasGroup);
+        }
+
+        public void CloseRewards()
+        {
+            isRewardsOpen = false;
+            HideModal(rewardsPanel, rewardsCanvasGroup);
+            RefreshAllViews();
         }
 
         public void OnPlayClicked()

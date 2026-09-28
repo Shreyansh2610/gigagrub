@@ -152,21 +152,29 @@ namespace GigaGrub.Food
 
         private void OnTriggerEnter2D(Collider2D other)
         {
-            if (isConsumed) return;
+            if (isConsumed || other == null) return;
 
-            // Fast tag / layer check without redundant string or layer conversions
-            if (other.CompareTag("Player") || other.CompareTag("AICreature") || (playerLayer >= 0 && other.gameObject.layer == playerLayer))
+            PlayerBody body = other.GetComponent<PlayerBody>() ?? other.GetComponentInParent<PlayerBody>();
+            if (body == null)
             {
-                PlayerBody body = other.GetComponent<PlayerBody>();
-                if (body == null)
+                var seg = other.GetComponent<PlayerSegment>() ?? other.GetComponentInParent<PlayerSegment>();
+                if (seg != null)
                 {
-                    body = other.GetComponentInParent<PlayerBody>();
+                    body = seg.Owner;
                 }
+            }
+            if (body == null)
+            {
+                var col = other.GetComponent<CreatureCollision>() ?? other.GetComponentInParent<CreatureCollision>();
+                if (col != null)
+                {
+                    body = col.GetComponent<PlayerBody>() ?? col.GetComponentInParent<PlayerBody>();
+                }
+            }
 
-                if (body != null)
-                {
-                    Consume(body);
-                }
+            if (body != null)
+            {
+                Consume(body);
             }
         }
     }
