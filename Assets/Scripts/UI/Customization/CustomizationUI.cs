@@ -509,7 +509,7 @@ namespace GigaGrub.UI.Customization
             OnClosed?.Invoke();
 
             // 4. Update MainMenuUI directly
-            MainMenuUI menu = FindFirstObjectByType<MainMenuUI>();
+            MainMenuUI menu = FindAnyObjectByType<MainMenuUI>();
             if (menu != null && menu.IsCustomizeOpen)
             {
                 menu.CloseCustomization();

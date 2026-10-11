@@ -164,10 +164,30 @@ namespace GigaGrub.UI
             HideModalImmediate(statisticsPanel, statisticsCanvasGroup);
             HideModalImmediate(settingsPanel, settingsCanvasGroup);
             CheckRewardsNotificationBadge();
+
+            if (GigaGrub.Rewards.DailyRewardManager.Instance != null)
+            {
+                GigaGrub.Rewards.DailyRewardManager.Instance.OnDailyStatusChanged += CheckRewardsNotificationBadge;
+            }
+
+            if (GigaGrub.Rewards.QuestManager.Instance != null)
+            {
+                GigaGrub.Rewards.QuestManager.Instance.OnQuestsUpdated += CheckRewardsNotificationBadge;
+            }
         }
 
         private void OnDestroy()
         {
+            if (GigaGrub.Rewards.DailyRewardManager.HasInstance)
+            {
+                GigaGrub.Rewards.DailyRewardManager.Instance.OnDailyStatusChanged -= CheckRewardsNotificationBadge;
+            }
+
+            if (GigaGrub.Rewards.QuestManager.HasInstance)
+            {
+                GigaGrub.Rewards.QuestManager.Instance.OnQuestsUpdated -= CheckRewardsNotificationBadge;
+            }
+
             if (playButton != null) playButton.onClick.RemoveListener(OnPlayClicked);
             if (customizeButton != null) customizeButton.onClick.RemoveListener(OpenCustomization);
             if (statisticsButton != null) statisticsButton.onClick.RemoveListener(OpenStatistics);

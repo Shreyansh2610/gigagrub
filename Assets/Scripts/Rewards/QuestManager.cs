@@ -10,7 +10,35 @@ namespace GigaGrub.Rewards
 {
     public class QuestManager : MonoBehaviour
     {
-        public static QuestManager Instance { get; private set; }
+        private static QuestManager instance;
+        public static bool HasInstance => instance != null;
+
+        public static QuestManager Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = FindAnyObjectByType<QuestManager>();
+                    if (instance == null)
+                    {
+                        GameObject go = new GameObject("QuestManager");
+                        instance = go.AddComponent<QuestManager>();
+                        if (Application.isPlaying)
+                        {
+                            DontDestroyOnLoad(go);
+                        }
+                    }
+                }
+                return instance;
+            }
+            private set => instance = value;
+        }
+
+        public static void SetInstanceForTest(QuestManager testInstance)
+        {
+            instance = testInstance;
+        }
 
         [SerializeField] private List<QuestProgress> activeQuests = new List<QuestProgress>();
         private string currentQuestDate = "";
@@ -22,21 +50,25 @@ namespace GigaGrub.Rewards
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (instance != null && instance != this)
             {
                 Destroy(gameObject);
                 return;
             }
 
-            Instance = this;
+            instance = this;
+            if (Application.isPlaying)
+            {
+                DontDestroyOnLoad(gameObject);
+            }
             InitializeDailyQuests();
         }
 
         private void OnDestroy()
         {
-            if (Instance == this)
+            if (instance == this)
             {
-                Instance = null;
+                instance = null;
             }
         }
 

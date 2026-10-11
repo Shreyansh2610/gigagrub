@@ -8,7 +8,35 @@ namespace GigaGrub.Rewards
 {
     public class DailyRewardManager : MonoBehaviour
     {
-        public static DailyRewardManager Instance { get; private set; }
+        private static DailyRewardManager instance;
+        public static bool HasInstance => instance != null;
+
+        public static DailyRewardManager Instance
+        {
+            get
+            {
+                if (instance == null)
+                {
+                    instance = FindAnyObjectByType<DailyRewardManager>();
+                    if (instance == null)
+                    {
+                        GameObject go = new GameObject("DailyRewardManager");
+                        instance = go.AddComponent<DailyRewardManager>();
+                        if (Application.isPlaying)
+                        {
+                            DontDestroyOnLoad(go);
+                        }
+                    }
+                }
+                return instance;
+            }
+            private set => instance = value;
+        }
+
+        public static void SetInstanceForTest(DailyRewardManager testInstance)
+        {
+            instance = testInstance;
+        }
 
         private static readonly int[] DayRewards = new int[] { 100, 150, 200, 250, 350, 500, 800 };
 
@@ -17,20 +45,24 @@ namespace GigaGrub.Rewards
 
         private void Awake()
         {
-            if (Instance != null && Instance != this)
+            if (instance != null && instance != this)
             {
                 Destroy(gameObject);
                 return;
             }
 
-            Instance = this;
+            instance = this;
+            if (Application.isPlaying)
+            {
+                DontDestroyOnLoad(gameObject);
+            }
         }
 
         private void OnDestroy()
         {
-            if (Instance == this)
+            if (instance == this)
             {
-                Instance = null;
+                instance = null;
             }
         }
 
@@ -48,6 +80,16 @@ namespace GigaGrub.Rewards
             if (string.IsNullOrEmpty(lastClaim))
             {
                 return true; // First time playing
+            }
+
+            if (DateTime.TryParse(lastClaim, out DateTime lastClaimDate))
+            {
+                int daysDiff = (DateTime.Today - lastClaimDate.Date).Days;
+                if (daysDiff <= 0)
+                {
+                    return false; // Already claimed today or clock moved backwards
+                }
+                return true;
             }
 
             return !string.Equals(today, lastClaim, StringComparison.OrdinalIgnoreCase);
@@ -85,6 +127,11 @@ namespace GigaGrub.Rewards
                     if (nextDay > 7) nextDay = 1; // Cycle back after 7 days
                     return nextDay;
                 }
+                else if (daysDiff < 0)
+                {
+                    // System clock moved backwards
+                    return Mathf.Clamp(streak, 1, 7);
+                }
                 else
                 {
                     // Missed more than 1 day -> reset streak to Day 1
@@ -99,7 +146,8 @@ namespace GigaGrub.Rewards
         {
             DateTime now = DateTime.Now;
             DateTime tomorrow = DateTime.Today.AddDays(1);
-            return tomorrow - now;
+            TimeSpan diff = tomorrow - now;
+            return diff.TotalSeconds > 0 ? diff : TimeSpan.Zero;
         }
 
         public bool ClaimTodayReward()

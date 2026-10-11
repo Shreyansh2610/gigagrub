@@ -1667,6 +1667,12 @@ namespace GigaGrub.Editor
             GameObject cosmeticMgrGo = new GameObject("CosmeticManager");
             cosmeticMgrGo.AddComponent<GigaGrub.Cosmetics.CosmeticManager>();
 
+            GameObject dailyRewardGo = new GameObject("DailyRewardManager");
+            dailyRewardGo.AddComponent<DailyRewardManager>();
+
+            GameObject questMgrGo = new GameObject("QuestManager");
+            questMgrGo.AddComponent<QuestManager>();
+
             // 3. Main Menu Canvas (1920x1080 Landscape Scaler)
             GameObject canvasGo = new GameObject("MainMenuCanvas");
             Canvas canvas = canvasGo.AddComponent<Canvas>();

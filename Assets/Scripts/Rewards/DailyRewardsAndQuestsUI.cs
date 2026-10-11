@@ -63,13 +63,13 @@ namespace GigaGrub.Rewards
 
         private void OnDisable()
         {
-            if (DailyRewardManager.Instance != null)
+            if (DailyRewardManager.HasInstance)
             {
                 DailyRewardManager.Instance.OnRewardClaimed -= HandleRewardClaimed;
                 DailyRewardManager.Instance.OnDailyStatusChanged -= RefreshUI;
             }
 
-            if (QuestManager.Instance != null)
+            if (QuestManager.HasInstance)
             {
                 QuestManager.Instance.OnQuestsUpdated -= RefreshUI;
                 QuestManager.Instance.OnQuestClaimed -= HandleQuestClaimed;
@@ -80,8 +80,15 @@ namespace GigaGrub.Rewards
         {
             if (countdownText != null && DailyRewardManager.Instance != null)
             {
-                TimeSpan remaining = DailyRewardManager.Instance.GetTimeUntilNextDay();
-                countdownText.text = $"Next Reward In: {remaining.Hours:D2}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+                if (DailyRewardManager.Instance.IsRewardAvailable())
+                {
+                    countdownText.text = "Reward Ready To Claim!";
+                }
+                else
+                {
+                    TimeSpan remaining = DailyRewardManager.Instance.GetTimeUntilNextDay();
+                    countdownText.text = $"Next Reward In: {remaining.Hours:D2}:{remaining.Minutes:D2}:{remaining.Seconds:D2}";
+                }
             }
         }
 
@@ -204,7 +211,7 @@ namespace GigaGrub.Rewards
                     else if (dayNum == currentDay && isAvailable)
                     {
                         // Ready to claim today
-                        dayCardBgs[i].color = new Color(0.12f, 0.45f, 0.30f, 0.95f);
+                        dayCardBgs[i].color = (dayNum == 7) ? new Color(0.35f, 0.28f, 0.08f, 0.95f) : new Color(0.12f, 0.45f, 0.30f, 0.95f);
                         if (dayCardClaimedBadges != null && i < dayCardClaimedBadges.Length && dayCardClaimedBadges[i] != null)
                         {
                             dayCardClaimedBadges[i].SetActive(false);
@@ -213,7 +220,7 @@ namespace GigaGrub.Rewards
                     else
                     {
                         // Future locked day
-                        dayCardBgs[i].color = new Color(0.10f, 0.14f, 0.22f, 0.85f);
+                        dayCardBgs[i].color = (dayNum == 7) ? new Color(0.20f, 0.15f, 0.08f, 0.85f) : new Color(0.10f, 0.14f, 0.22f, 0.85f);
                         if (dayCardClaimedBadges != null && i < dayCardClaimedBadges.Length && dayCardClaimedBadges[i] != null)
                         {
                             dayCardClaimedBadges[i].SetActive(false);
@@ -382,7 +389,15 @@ namespace GigaGrub.Rewards
 
         private void OnCloseClicked()
         {
-            Hide();
+            GigaGrub.UI.MainMenuUI menuUI = GetComponentInParent<GigaGrub.UI.MainMenuUI>();
+            if (menuUI != null)
+            {
+                menuUI.CloseRewards();
+            }
+            else
+            {
+                Hide();
+            }
         }
     }
 }
